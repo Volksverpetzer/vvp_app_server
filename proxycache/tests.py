@@ -50,24 +50,26 @@ class ProxyTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "pp_token")
 
-    @patch("proxycache.services.insta_feed.refreshInstaToken")
-    @patch("proxycache.services.insta_feed.requests.get")
-    def test_insta_upstream_error_not_cached(self, mock_get, mock_refresh):
-        # Instagram returns errors (e.g. invalidated token) as a 200 body with
-        # an "error" key; these must not be cached and replayed.
-        mock_get.return_value.json.return_value = {"error": {"code": 190}}
-        mock_refresh.return_value = ("dummy_token", 3600)  # nosec
-        InstaToken.objects.create(
-            token="dummy_token", expires_in=3600  # nosec
-        )
-        response = self.c.get("/proxy/instaFeed?cachebust=err")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("error", response.json())
-        calls_after_first = mock_get.call_count
-        # a second request must re-hit the upstream rather than serve a cache
-        response2 = self.c.get("/proxy/instaFeed?cachebust=err")
-        self.assertIn("error", response2.json())
-        self.assertGreater(mock_get.call_count, calls_after_first)
+    def test_cache_response_skips_error_bodies(self):
+        # An upstream that returns a 200 body containing an "error" key (e.g.
+        # Bluesky) must not be cached and replayed. Tested at the cache layer
+        # directly, independent of any view's status-code handling.
+        from django.http import JsonResponse
+
+        from vvp_app_server.cache_utils import cache_response
+
+        calls = {"n": 0}
+
+        @cache_response(lambda request, *a, **k: request.get_full_path(), 600)
+        def view(request):
+            calls["n"] += 1
+            return JsonResponse({"error": {"code": 190}})
+
+        req = RequestFactory().get("/dummy-error-cache-test")
+        view(req)
+        view(req)
+        # error body not cached: the wrapped view is re-invoked each time
+        self.assertEqual(calls["n"], 2)
 
     def test_insta_invalid_account(self):
         response = self.c.get("/proxy/instaFeed?account=unknown")
@@ -75,6 +77,25 @@ class ProxyTest(TestCase):
         # error responses must not be cached and replayed as 200
         response2 = self.c.get("/proxy/instaFeed?account=unknown")
         self.assertEqual(response2.status_code, 400)
+
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    @patch("proxycache.services.insta_feed.requests.get")
+    def test_insta_upstream_error_returns_502(self, mock_get, mock_refresh):
+        # upstream keeps returning an error even after the token retry
+        mock_get.return_value.json.return_value = {"error": {"code": 190}}
+        mock_refresh.return_value = ("new_token", 3600)  # nosec
+        response = self.c.get("/proxy/instaFeed?case=upstream-error")
+        self.assertEqual(response.status_code, 502)
+        # the retry refreshed the token once
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    @patch("proxycache.services.insta_feed.requests.get")
+    def test_insta_by_id_upstream_error_returns_502(self, mock_get, mock_refresh):
+        mock_get.return_value.json.return_value = {"error": {"code": 190}}
+        mock_refresh.return_value = ("new_token", 3600)  # nosec
+        response = self.c.get("/proxy/instaById/999?case=upstream-error")
+        self.assertEqual(response.status_code, 502)
 
     @patch("proxycache.services.insta_feed.refreshInstaToken")
     @patch("proxycache.services.insta_feed.requests.get")

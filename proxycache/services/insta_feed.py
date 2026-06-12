@@ -51,6 +51,10 @@ def instaFeed(request: HttpRequest) -> JsonResponse | HttpResponse:
             raw_data = response.json()
     except (requests.exceptions.RequestException, ValueError):
         return HttpResponse(status=502)
+    if isinstance(raw_data, dict) and "error" in raw_data:
+        # the token refresh did not help: don't serve the upstream error
+        # payload as a cacheable 200
+        return HttpResponse(status=502)
     if not isinstance(raw_data, dict):
         # return error
         return HttpResponse(status=500)
@@ -82,6 +86,10 @@ def instaById(request: HttpRequest, id: str) -> JsonResponse | HttpResponse:
             response = requests.get(url=url, params=params, timeout=10)
             raw_data = response.json()
     except (requests.exceptions.RequestException, ValueError):
+        return HttpResponse(status=502)
+    if isinstance(raw_data, dict) and "error" in raw_data:
+        # the token refresh did not help: don't serve the upstream error
+        # payload as a cacheable 200
         return HttpResponse(status=502)
     if not isinstance(raw_data, dict):
         return JsonResponse(raw_data, safe=False)
