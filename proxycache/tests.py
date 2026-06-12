@@ -95,6 +95,19 @@ class ProxyTest(TestCase):
                 mock_get.call_args[1]["params"]["access_token"], "pp_env_token"
             )
 
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    def test_get_token_partial_refresh_falls_back_to_env(self, mock_refresh):
+        from proxycache.services.insta_feed import getToken
+
+        # expired stored token
+        InstaToken.objects.create(token="stale_token", expires_in=0)  # nosec
+        # refresh returns a token but no expires_in
+        mock_refresh.return_value = ("half_refreshed", None)  # nosec
+        with patch.dict(os.environ, {"INSTAGRAM_ACCESS_TOKEN": "env_token"}):
+            self.assertEqual(getToken(), "env_token")
+        # the stored row was not corrupted by the partial refresh result
+        self.assertEqual(InstaToken.objects.get().token, "stale_token")
+
     def test_tiktok(self):
         # mock tiktok API request
         with patch("proxycache.services.tiktok_feed.requests.post") as mock_post:
