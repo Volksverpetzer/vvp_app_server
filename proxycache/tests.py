@@ -439,6 +439,30 @@ class CacheUtilsTest(TestCase):
         self.assertEqual(result, {"x": 1})
         self.assertEqual(caches["default"].get(key), {"x": 1})
 
+    def test_cache_response_replays_list_body(self):
+        import json
+
+        from django.http import JsonResponse
+        from django.test import RequestFactory
+        from vvp_app_server.cache_utils import cache_response
+
+        calls = []
+
+        @cache_response(lambda req: "list_body_key", 60)
+        def list_view(request):
+            calls.append(1)
+            return JsonResponse([1, 2], safe=False)
+
+        rf = RequestFactory()
+        response = list_view(rf.get("/"))
+        self.assertEqual(json.loads(response.content), [1, 2])
+        # second call is served from the cache and must not crash on the
+        # non-dict body
+        response2 = list_view(rf.get("/"))
+        self.assertEqual(response2.status_code, 200)
+        self.assertEqual(json.loads(response2.content), [1, 2])
+        self.assertEqual(len(calls), 1)
+
     def test_cache_response_non_json_passes_through(self):
         from django.http import HttpResponse
         from django.test import RequestFactory
