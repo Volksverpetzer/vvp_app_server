@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <h1 class="mb-4">Reports</h1>
+  {% if reports %}
+    <div class="row">
+      {% for report in reports %}
+        <div class="col-md-6">
+          <div class="card mb-4 shadow-sm">
+            <div class="card-header text-muted">
+              {{ report.date|date:"SHORT_DATE_FORMAT" }}
+            </div>
+            <div class="card-body">
+              <h5 class="card-title">{{ report.description }}</h5>
+              <p class="card-text">
+                {% if report.url|lower|slice:":7" == "http://" or report.url|lower|slice:":8" == "https://" %}
+                  <a href="{{ report.url }}" target="_blank" rel="noopener noreferrer">{{ report.url }}</a>
+                {% else %}
+                  {{ report.url }} (Invalid URL)
+                {% endif %}
+              </p>
+              {% if report.more_info %}
+                <p class="card-text">{{ report.more_info }}</p>
+              {% endif %}
+              <div class="d-flex justify-content-between align-items-center mt-3">
+                <form action="{% url 'assign_bluesky' %}" method="POST" class="d-flex align-items-center">
+                  {% csrf_token %}
+                  <input type="hidden" name="report_id" value="{{ report.id }}">
+                  <div class="input-group input-group-sm me-2" style="width: 300px;">
+                    <input type="url" name="bluesky_url" class="form-control form-control-sm" placeholder="Bluesky URL" required>
+                    <button type="submit" class="btn btn-primary btn-sm">Assign</button>
+                  </div>
+                </form>
+                <form action="{% url 'archiveFake' %}" method="POST">
+                  {% csrf_token %}
+                  <input type="hidden" name="report_id" value="{{ report.id }}">
+                  <button type="submit" class="btn btn-danger btn-sm">Archive</button>
+                </form>
+              </div>
+              {% if report.bluesky_url %}
+                <div class="mt-2">
+                  <small class="text-muted">Published on Bluesky: 
+                    {% if report.bluesky_url|lower|slice:":7" == "http://" or report.bluesky_url|lower|slice:":8" == "https://" %}
+                      <a href="{{ report.bluesky_url }}" target="_blank" rel="noopener noreferrer">View Post</a>
+                    {% else %}
+                      Invalid URL
+                    {% endif %}
+                  </small>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>No reports pending.</p>
+  {% endif %}
+</div>
+{% endblock %}

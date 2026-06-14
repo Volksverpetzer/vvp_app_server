@@ -1,0 +1,19 @@
+{
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit",
+            "source.fixAll": "explicit"
+        },
+        "python.analysis.languageServer": "Pylance",
+        "python.analysis.typeCheckingMode": "strict",
+        "python.analysis.diagnosticSeverityOverrides": {
+            "reportMissingImports": "error",
+            "reportMissingTypeStubs": "warning"
+        },
+        // Disable mypy linting; we use Pyright via Pylance
+        "python.linting.enabled": true,
+        // Pyright is enabled by default in the Pylance server; configuration will be in pyrightconfig.json
+    }
+}

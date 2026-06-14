@@ -1,0 +1,10 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{% block title %}
+  {% if title %}{{ title }} | {% endif %}{% trans "VVP Administration" %}
+{% endblock %}
+
+{% block nav-global %}
+  <a href="{% url 'admin:clear-cache' %}">{% trans "Clear cache" %}</a>
+{% endblock %}

@@ -1,0 +1,25 @@
+{
+  "include": [
+    "factApi",
+    "notifications",
+    "payment",
+    "proxycache",
+    "reportFake",
+    "info",
+    "vvp_app_server"
+  ],
+  "exclude": [
+    "**/migrations",
+    ".venv",
+    "**/__pycache__"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.13",
+  "strict": [],
+  "reportMissingImports": true,
+  "reportMissingTypeStubs": true,
+  "reportMissingParameterType": true,
+  "reportMissingReturnType": true,
+  "reportUnusedImport": true
+}

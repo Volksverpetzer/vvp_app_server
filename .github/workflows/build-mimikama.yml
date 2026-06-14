@@ -1,0 +1,60 @@
+name: Build and Deploy Mimikama
+
+on:
+  push:
+    branches:
+      - 'mimikama'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: .python-version
+
+      - name: Create and start virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv --system pip sync requirements.txt
+
+      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
+
+      - name: Upload artifact for deployment jobs
+        uses: actions/upload-artifact@v7
+        with:
+          name: python-app
+          path: |
+            .
+            !venv/
+
+  deployMimikama:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-mimikama-to-webapp.outputs.webapp-url }}
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v8
+        with:
+          name: python-app
+          path: .
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        id: deploy-mimikama-to-webapp
+        with:
+          app-name: 'mimikamaserver'
+          slot-name: 'production'
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_F3CF7AA3A0E34E3DB782E6F599A0B11B }}

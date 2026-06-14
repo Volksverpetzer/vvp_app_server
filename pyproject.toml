@@ -1,0 +1,5 @@
+[tool.ruff.lint]
+select = ["E", "F", "DJ", "DTZ", "S", "PD"]
+exclude = ["tests.py", "venv"]
+[tool.bandit]
+exclude = ["venv", "**/tests.py", "**/test_*.py", "**/tests/*.py"]
