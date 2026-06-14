@@ -132,6 +132,18 @@ class ReportFakeViewsTest(TestCase):
         self.assertNotIn('href="javascript:alert(1)"', content)
         self.assertIn("javascript:alert(1)", content)
 
+    def test_assign_bluesky_saves_url(self):
+        report = FakeReport.objects.create(
+            description="d", url="https://example.com", more_info="m", allowed_public=True
+        )
+        response = self.client.post(
+            "/assign-bluesky",
+            {"report_id": str(report.id), "bluesky_url": "https://bsky.app/profile/test/post/1"},
+        )
+        self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
+        report.refresh_from_db()
+        self.assertEqual(report.bluesky_url, "https://bsky.app/profile/test/post/1")
+
     def test_assign_bluesky_rejects_invalid_scheme(self):
         report = FakeReport.objects.create(
             description="d", url="https://example.com", more_info="m", allowed_public=True
@@ -141,6 +153,8 @@ class ReportFakeViewsTest(TestCase):
             {"report_id": str(report.id), "bluesky_url": "javascript:void(0)"},
         )
         self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
+        report.refresh_from_db()
+        self.assertIsNone(report.bluesky_url)
 
     def test_statusFake(self):
         response = self.client.get("/statusFake/999")

@@ -14,4 +14,5 @@ class FakeReport(models.Model):
     allowed_public = models.BooleanField(default=False, null=True)
     post_id = models.CharField(max_length=100, default=None, null=True)
     date = models.DateTimeField(auto_now_add=True, null=True)
+    bluesky_url = models.URLField(default=None, null=True, blank=True)
     # img = models.ImageField(upload_to='images/', default=None)

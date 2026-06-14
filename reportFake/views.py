@@ -143,6 +143,8 @@ def assign_bluesky(request: HttpRequest):
 
         try:
             report = FakeReport.objects.get(id=report_id)
+            report.bluesky_url = bluesky_url
+            report.save(update_fields=["bluesky_url"])
 
             # Send notification to the user if they have a device token
             if report.token:
