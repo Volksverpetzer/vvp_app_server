@@ -455,27 +455,6 @@ class CacheUtilsTest(TestCase):
         self.assertEqual(response.content, b"\x89PNG")
 
 
-class InstaMemeAccountTest(TestCase):
-    def setUp(self):
-        self.client = Client()
-
-    @patch("proxycache.services.insta_feed.requests.get")
-    def test_memes_account_uses_stored_token(self, mock_get):
-        mock_get.return_value.json.return_value = {"data": []}
-        InstaToken.objects.create(token="meme_token", expires_in=3600, account="memes")  # nosec
-        response = self.client.get("/proxy/instaFeed?account=memes")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "meme_token")
-
-    @patch("proxycache.services.insta_feed.requests.get")
-    def test_memes_account_env_token_fallback(self, mock_get):
-        mock_get.return_value.json.return_value = {"data": []}
-        with patch.dict(os.environ, {"INSTAGRAM_MEME_TOKEN": "meme_env_token"}):  # nosec
-            response = self.client.get("/proxy/instaFeed?account=memes&cachebust=memesenv")
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "meme_env_token")
-
-
 class TiktokHelperTest(TestCase):
     @patch("proxycache.services.tiktok_feed.requests.post")
     @patch.dict(os.environ, {"TIKTOK_CLIENT_KEY": "k", "TIKTOK_CLIENT_SECRET": "s", "TIKTOK_REFRESH_TOKEN": "rt"})

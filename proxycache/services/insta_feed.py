@@ -16,7 +16,6 @@ DEFAULT_ACCOUNT = "volksverpetzer"
 ACCOUNTS = {
     "volksverpetzer": {"token_env": "INSTAGRAM_ACCESS_TOKEN"},
     "pruefpunkt": {"token_env": "INSTAGRAM_ACCESS_TOKEN_PRUEFPUNKT"},
-    "memes": {"token_env": "INSTAGRAM_MEME_TOKEN"},
 }
 
 
