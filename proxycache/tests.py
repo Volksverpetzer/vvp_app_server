@@ -455,30 +455,6 @@ class CacheUtilsTest(TestCase):
         self.assertEqual(response.content, b"\x89PNG")
 
 
-class InstaMemeTest(TestCase):
-    def setUp(self):
-        self.client = Client()
-
-    @patch("proxycache.services.insta_meme_feed.requests.get")
-    @patch.dict(os.environ, {"INSTAGRAM_MEME_TOKEN": "test_token"})  # nosec
-    def test_insta_meme_feed_success(self, mock_get):
-        mock_get.return_value.json.return_value = {
-            "data": [{"id": "1", "media_url": "https://example.com/img.jpg"}]
-        }
-        response = self.client.get("/proxy/instaMemeFeed")
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertIn("data", data)
-
-    @patch("proxycache.services.insta_meme_feed.requests.get")
-    @patch.dict(os.environ, {"INSTAGRAM_MEME_TOKEN": "test_token"})  # nosec
-    def test_insta_meme_feed_api_error_returns_empty(self, mock_get):
-        mock_get.return_value.json.return_value = {"error": {"message": "API error"}}
-        response = self.client.get("/proxy/instaMemeFeed")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"data": []})
-
-
 class TiktokHelperTest(TestCase):
     @patch("proxycache.services.tiktok_feed.requests.post")
     @patch.dict(os.environ, {"TIKTOK_CLIENT_KEY": "k", "TIKTOK_CLIENT_SECRET": "s", "TIKTOK_REFRESH_TOKEN": "rt"})

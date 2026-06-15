@@ -31,8 +31,7 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 | `GET` | `/task_monitor` | notifications | Django-Q task queue status |
 | `GET` | `/receipts_monitor` | notifications | Push receipt monitoring |
 | `POST` | `/paymentIntent` | payment | Create Stripe payment intent |
-| `GET` | `/proxy/instaFeed` | proxycache | Instagram main-account feed |
-| `GET` | `/proxy/instaMemeFeed` | proxycache | Instagram meme-account feed |
+| `GET` | `/proxy/instaFeed` | proxycache | Instagram feed (`?account=volksverpetzer\|pruefpunkt`) |
 | `GET` | `/proxy/instaById/<id>` | proxycache | Single Instagram post |
 | `GET` | `/proxy/blueskyFeed` | proxycache | Bluesky feed |
 | `GET` | `/proxy/tiktokFeed` | proxycache | TikTok feed |
@@ -62,8 +61,8 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `NOTIFICATION_BEARER` | Bearer token to authenticate incoming webhook calls |
 | `GOOGLE_FACT` | Google Fact Check API key |
 | `STRIPE_SECRET_KEY` | Stripe live secret key |
-| `INSTAGRAM_ACCESS_TOKEN` | Instagram Graph API token (main account) |
-| `INSTAGRAM_MEME_TOKEN` | Instagram Graph API token (meme account) |
+| `INSTAGRAM_ACCESS_TOKEN` | Instagram Graph API token (volksverpetzer account) |
+| `INSTAGRAM_ACCESS_TOKEN_PRUEFPUNKT` | Instagram Graph API token (pruefpunkt account) |
 | `BSKY_HANDLE` | Bluesky handle for feed fetching |
 | `BSKY_PWD` | Bluesky password for feed fetching |
 | `BOT_BSKY_HANDLE` | Bluesky bot account handle (fact-check replies) |
