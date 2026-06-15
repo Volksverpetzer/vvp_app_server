@@ -7,5 +7,4 @@ urlpatterns = [
     path("archiveFake", views.archiveFake, name="archiveFake"),
     path("assign-bluesky", views.assign_bluesky, name="assign_bluesky"),
     path("statusFake/<uuid:report_id>", views.statusFake, name="statusFake"),
-    path("botFeed", views.botFeed, name="botFeed"),
 ]
