@@ -67,8 +67,8 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `BSKY_PWD` | Bluesky password for feed fetching (volksverpetzer) |
 | `BSKY_HANDLE_PRUEFPUNKT` | Bluesky handle for feed fetching (pruefpunkt, optional) |
 | `BSKY_PWD_PRUEFPUNKT` | Bluesky password for feed fetching (pruefpunkt, optional) |
-| `BOT_BSKY_HANDLE` | Bluesky bot account handle (fact-check replies) |
-| `BOT_BSKY_PWD` | Bluesky bot account password |
+| `BSKY_BOT_HANDLE` | Bluesky bot account handle (fact-check replies) |
+| `BSKY_BOT_PWD` | Bluesky bot account password |
 | `TIKTOK_CLIENT_KEY` | TikTok API client key |
 | `TIKTOK_CLIENT_SECRET` | TikTok API client secret |
 | `TIKTOK_REFRESH_TOKEN` | TikTok OAuth refresh token (fallback when no DB token exists) |

@@ -181,7 +181,7 @@ def statusFake(request: HttpRequest, report_id: uuid.UUID):
     if not report:
         return JsonResponse({"error": "Not found"}, status=404)
     status = "posted" if report.post_id else "pending"
-    handle = os.environ.get("BOT_BSKY_HANDLE", "")
+    handle = os.environ.get("BSKY_BOT_HANDLE", "")
     url = report.post_id and (
         f"https://bsky.app/profile/{handle}/post/" f"{report.post_id}"
     )

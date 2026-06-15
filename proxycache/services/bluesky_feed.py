@@ -11,7 +11,7 @@ DEFAULT_ACCOUNT = "volksverpetzer"
 ACCOUNTS = {
     "volksverpetzer": {"handle_env": "BSKY_HANDLE", "pwd_env": "BSKY_PWD"},
     "pruefpunkt": {"handle_env": "BSKY_HANDLE_PRUEFPUNKT", "pwd_env": "BSKY_PWD_PRUEFPUNKT"},
-    "bot": {"handle_env": "BOT_BSKY_HANDLE", "pwd_env": "BOT_BSKY_PWD"},
+    "bot": {"handle_env": "BSKY_BOT_HANDLE", "pwd_env": "BSKY_BOT_PWD"},
 }
 
 
