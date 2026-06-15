@@ -45,10 +45,6 @@ jobs:
           PLAUSIBLE_TOKEN: ${{ secrets.PLAUSIBLE_TOKEN }}
           GOOGLE_FACT: ${{ secrets.GOOGLE_FACT }}
           YT_ACCESS_TOKEN: ${{ secrets.YT_ACCESS_TOKEN }}
-          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
-          EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
-          EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
-          EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
 
   docker-build:
     runs-on: ubuntu-latest
