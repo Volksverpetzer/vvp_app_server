@@ -16,8 +16,9 @@ def register(request: HttpRequest) -> JsonResponse:
     Args:
         request (django request): django POST request with a json body that
             contains two keys: "expo_token" and "settings". "settings" is a
-            dictionary with two keys: "new_post" and "new_fact_check". Each
-            of these is a dictionary with one key: "value".
+            dictionary with the keys "new_post", "new_fact_check" and the
+            optional "new_pruefpunkt". Each of these is a dictionary with one
+            key: "value".
 
     Returns:
         JSONResponse: 200 if sucess, 403 if not
@@ -43,6 +44,11 @@ def register(request: HttpRequest) -> JsonResponse:
         device, created = NotificationDevice.objects.get_or_create(expo_token=token)
         device.notification_new_post = settings["new_post"]["value"]
         device.notification_new_fact_check = settings["new_fact_check"]["value"]
+        # Optional: older app versions don't send this key. Only update when
+        # present so we keep the device's current value (default off).
+        pruefpunkt = settings.get("new_pruefpunkt")
+        if isinstance(pruefpunkt, dict) and "value" in pruefpunkt:
+            device.notification_new_pruefpunkt = pruefpunkt["value"]
         device.save()
     except Exception as e:
         logger.exception("Failed to save NotificationDevice: %s", e)
