@@ -56,7 +56,6 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `DATABASE_URL` | PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/db`) |
 | `DB_SSLMODE` | SSL mode for DB connection (`require`, `disable`, …) |
 | `DB_SSLROOTCERT` | Path to SSL root certificate |
-| `APP_NAME` | Display name used in push notification messages |
 | `EXPO_TOKEN` | Expo push notification server token |
 | `NOTIFICATION_BEARER` | Bearer token to authenticate incoming webhook calls |
 | `GOOGLE_FACT` | Google Fact Check API key |
