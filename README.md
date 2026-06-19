@@ -24,7 +24,6 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 | `POST` | `/archiveFake` | reportFake | Archive a report |
 | `POST` | `/assign-bluesky` | reportFake | Assign Bluesky post to report |
 | `GET` | `/statusFake/<uuid>` | reportFake | Check report status |
-| `GET` | `/botFeed` | reportFake | Bluesky bot reply feed |
 | `POST` | `/register` | notifications | Register device for push notifications |
 | `POST` | `/webhook_new_post` | notifications | Trigger push notifications for a new post |
 | `POST` | `/notification_stats` | notifications | Push notification delivery stats |
@@ -76,7 +75,6 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `MAILGUN_TOKEN` | Mailgun API token |
 | `MAILGUN_RECEIVER` | Email address to receive fake-report notifications |
 | `PLAUSIBLE_TOKEN` | Plausible Analytics API token |
-| `WP_URL` | WordPress site URL for new-post webhooks |
 
 ## Local Development
 
