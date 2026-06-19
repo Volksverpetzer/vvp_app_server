@@ -498,3 +498,45 @@ class TiktokHelperTest(TestCase):
         }
         token = getTiktokToken()
         self.assertEqual(token, "refreshed")
+
+
+class BlueskyFeedAccountTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    @patch("proxycache.services.bluesky_feed.Client")
+    def test_default_account_uses_vvp_env(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:vvp")
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
+        with patch.dict(os.environ, {"BSKY_HANDLE": "vvp.bsky.social", "BSKY_PWD": "vvp_pass"}):  # nosec
+            response = self.client.get("/proxy/blueskyFeed")
+        self.assertEqual(response.status_code, 200)
+        mock_client.login.assert_called_once_with("vvp.bsky.social", "vvp_pass")
+
+    @patch("proxycache.services.bluesky_feed.Client")
+    def test_pruefpunkt_account_uses_pruefpunkt_env(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:pp")
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
+        with patch.dict(os.environ, {"BSKY_HANDLE_PRUEFPUNKT": "pp.bsky.social", "BSKY_PWD_PRUEFPUNKT": "pp_pass"}):  # nosec
+            response = self.client.get("/proxy/blueskyFeed?account=pruefpunkt&cachebust=pp")
+        self.assertEqual(response.status_code, 200)
+        mock_client.login.assert_called_once_with("pp.bsky.social", "pp_pass")
+
+    @patch("proxycache.services.bluesky_feed.Client")
+    def test_bot_account_uses_bot_env(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:bot")
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
+        with patch.dict(os.environ, {"BSKY_BOT_HANDLE": "bot.bsky.social", "BSKY_BOT_PWD": "bot_pass"}):  # nosec
+            response = self.client.get("/proxy/blueskyFeed?account=bot&cachebust=bot")
+        self.assertEqual(response.status_code, 200)
+        mock_client.login.assert_called_once_with("bot.bsky.social", "bot_pass")
+
+    def test_invalid_account_returns_400(self):
+        response = self.client.get("/proxy/blueskyFeed?account=unknown&cachebust=inv")
+        self.assertEqual(response.status_code, 400)

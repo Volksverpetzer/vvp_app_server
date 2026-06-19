@@ -7,6 +7,7 @@ class NotificationDevice(models.Model):
     expo_token = models.CharField(max_length=256, unique=True)
     notification_new_post = models.BooleanField(default=True)
     notification_new_fact_check = models.BooleanField(default=True)
+    notification_new_pruefpunkt = models.BooleanField(default=False)
     date = models.DateTimeField(auto_now_add=True)
 
 

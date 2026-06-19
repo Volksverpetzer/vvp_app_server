@@ -196,22 +196,3 @@ class ReportFakeViewsTest(TestCase):
         response = ratelimit_view(request, Exception("rate limited"))
         self.assertEqual(response.status_code, 429)
 
-    @patch("reportFake.views.Client")
-    def test_botFeed(self, mock_client_cls: MagicMock) -> None:
-        mock_client = MagicMock()
-        mock_client_cls.return_value = mock_client
-        item = MagicMock()
-        item.reason = None
-        item.model_dump.return_value = {"uri": "at://actor/123"}
-        resp1 = MagicMock(cursor="cur", feed=[item])
-        resp2 = MagicMock(cursor=None, feed=[item])
-        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(
-            did="did"
-        )
-        mock_client.app.bsky.feed.get_author_feed.side_effect = [resp1, resp2]
-        response = self.client.get("/botFeed")
-
-        data = json.loads(response.content)
-        self.assertEqual(
-            data["feed"], [{"uri": "at://actor/123"}, {"uri": "at://actor/123"}]
-        )
