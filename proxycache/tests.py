@@ -50,6 +50,25 @@ class ProxyTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "pp_token")
 
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    @patch("proxycache.services.insta_feed.requests.get")
+    def test_insta_upstream_error_not_cached(self, mock_get, mock_refresh):
+        # Instagram returns errors (e.g. invalidated token) as a 200 body with
+        # an "error" key; these must not be cached and replayed.
+        mock_get.return_value.json.return_value = {"error": {"code": 190}}
+        mock_refresh.return_value = ("dummy_token", 3600)  # nosec
+        InstaToken.objects.create(
+            token="dummy_token", expires_in=3600  # nosec
+        )
+        response = self.c.get("/proxy/instaFeed?cachebust=err")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("error", response.json())
+        calls_after_first = mock_get.call_count
+        # a second request must re-hit the upstream rather than serve a cache
+        response2 = self.c.get("/proxy/instaFeed?cachebust=err")
+        self.assertIn("error", response2.json())
+        self.assertGreater(mock_get.call_count, calls_after_first)
+
     def test_insta_invalid_account(self):
         response = self.c.get("/proxy/instaFeed?account=unknown")
         self.assertEqual(response.status_code, 400)
