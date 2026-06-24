@@ -469,6 +469,34 @@ class AnalyticsLinksTest(TestCase, Client):
         # result should map dimensions to url
         expected = {"links": [{"visitors": 5, "url": page}]}
         self.assertEqual(response.json(), expected)
+        # no site param defaults to the primary site
+        self.assertEqual(mock_post.call_args[1]["json"]["site_id"], "volksverpetzer.de")
+
+    @patch("proxycache.services.analytics.cache_get", return_value=None)
+    @patch("proxycache.services.analytics.cache_set")
+    @patch("proxycache.services.analytics.requests.post")
+    def test_links_view_pruefpunkt_site(
+        self, mock_post: MagicMock, mock_cache_set: MagicMock, mock_cache_get: MagicMock
+    ):
+        page = "/foo/bar/"
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "results": [{"metrics": [5], "dimensions": [page]}]
+        }
+        mock_post.return_value = mock_resp
+
+        url = reverse("links", args=["foo/bar"]) + "?site=pruefpunkt.org"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_post.call_args[1]["json"]["site_id"], "pruefpunkt.org")
+
+    @patch.dict(os.environ, {"PLAUSIBLE_TOKEN": "test"})  # nosec
+    def test_links_view_invalid_site_returns_400(self):
+        url = reverse("links", args=["foo/bar"]) + "?site=evil.com"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "invalid site"})
 
 
 class AnalyticsMapTest(TestCase):
