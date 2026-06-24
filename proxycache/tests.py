@@ -111,6 +111,21 @@ class ProxyTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "pp_token")
 
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    def test_initialize_token_updates_existing_row(self, mock_refresh):
+        from proxycache.services.insta_feed import initializeToken
+
+        mock_refresh.return_value = ("first_token", 3600)  # nosec
+        initializeToken()
+        mock_refresh.return_value = ("second_token", 3600)  # nosec
+        initializeToken()
+        tokens = InstaToken.objects.filter(account="volksverpetzer")
+        self.assertEqual(tokens.count(), 1)
+        self.assertEqual(tokens.get().token, "second_token")
+        # other accounts get their own row
+        initializeToken("pruefpunkt")
+        self.assertEqual(InstaToken.objects.count(), 2)
+
     @patch("proxycache.services.insta_feed.requests.get")
     def test_insta_env_token_fallback_per_account(self, mock_get):
         mock_get.return_value.json.return_value = {"data": []}

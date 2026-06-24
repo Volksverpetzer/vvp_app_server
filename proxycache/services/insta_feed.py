@@ -116,11 +116,18 @@ def refreshInstaToken(
 
 
 def initializeToken(account: str = DEFAULT_ACCOUNT):
-    """Initialize Instagram token of the account in DB."""
+    """Initialize or update the Instagram token of the account in DB."""
     token, expires = refreshInstaToken(account=account)
     if not token or not expires:
         return
-    InstaToken.objects.create(token=token, expires_in=expires, account=account)
+    # update the active row instead of growing the table on every re-init
+    # (e.g. when the views re-initialize on repeated upstream errors)
+    obj = InstaToken.objects.filter(account=account).order_by("date").last()
+    if obj:
+        obj.token, obj.expires_in = token, expires
+        obj.save()
+    else:
+        InstaToken.objects.create(token=token, expires_in=expires, account=account)
 
 
 def getToken(account: str = DEFAULT_ACCOUNT):
