@@ -53,6 +53,10 @@ def cache_response(key_fn: Callable[..., str], timeout: int):
                 body = json.loads(response.content)
             except Exception:
                 return response
+            # upstream errors are returned as 200 with an {"error": ...} body
+            # (e.g. invalidated Instagram tokens); never cache those
+            if isinstance(body, dict) and "error" in body:
+                return response
             # Determine dynamic timeout if callable
             actual_timeout = (
                 timeout(request, *args, **kwargs) if callable(timeout) else timeout
