@@ -28,8 +28,13 @@ def blueskyFeed(request: HttpRequest):
     if err:
         return err
     cfg = ACCOUNTS[account]
-    handle = os.environ[cfg["handle_env"]]
-    password = os.environ[cfg["pwd_env"]]
+    handle = os.environ.get(cfg["handle_env"])
+    password = os.environ.get(cfg["pwd_env"])
+    if not handle or not password:
+        # The account is known but its credentials aren't configured on this
+        # deployment (e.g. the optional pruefpunkt/bot accounts). Return a
+        # controlled error instead of an uncaught KeyError / 500.
+        return JsonResponse({"error": "account not configured"}, status=503)
     client = Client()
     client.login(handle, password)
     did = client.com.atproto.identity.resolve_handle({"handle": handle}).did
