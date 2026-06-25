@@ -21,7 +21,12 @@ def register(request: HttpRequest) -> JsonResponse:
             key: "value".
 
     Returns:
-        JsonResponse: 200 if success, 403 if not
+        JsonResponse:
+            - 200 on success
+            - 400 on a malformed request (invalid JSON, missing "expo_token"/
+              "settings", or a malformed "settings" payload)
+            - 403 if the expo token is invalid
+            - 500 if the device could not be persisted
     """
     try:
         data = json.loads(request.body)
