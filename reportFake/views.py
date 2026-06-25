@@ -17,7 +17,6 @@ from django_ratelimit.decorators import (  # type: ignore[reportMissingTypeStubs
 
 from notifications.helper import send_push_message
 from notifications.models import NotificationDevice
-from proxycache.services.bluesky_feed import ACCOUNTS as BSKY_ACCOUNTS
 
 from .models import FakeReport
 
@@ -182,9 +181,13 @@ def statusFake(request: HttpRequest, report_id: uuid.UUID):
     if not report:
         return JsonResponse({"error": "Not found"}, status=404)
     status = "posted" if report.post_id else "pending"
-    handle = os.environ.get(BSKY_ACCOUNTS["bot"]["handle_env"], "")
-    url = report.post_id and (
-        f"https://bsky.app/profile/{handle}/post/" f"{report.post_id}"
+    handle = os.environ.get("BSKY_BOT_HANDLE", "")
+    # Only build a URL when both the post id and the bot handle are known;
+    # otherwise we'd produce an invalid ".../profile//post/..." link.
+    url = (
+        f"https://bsky.app/profile/{handle}/post/{report.post_id}"
+        if report.post_id and handle
+        else None
     )
     return JsonResponse({"id": report.id, "status": status, "url": url})
 

@@ -1,3 +1,32 @@
+# [1.2.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.1.0...v1.2.0) (2026-06-24)
+
+
+### Features
+
+* **Bluesky** — support multiple accounts in the bluesky proxy via `?account=` (mirrors the Instagram multi-account support); removed the unused `botFeed` endpoint ([#2](https://github.com/Volksverpetzer/vvp_app_server/issues/2))
+
+> **⚠️ Breaking (ops):** the Bluesky bot env vars were renamed `BOT_BSKY_HANDLE`/`BOT_BSKY_PWD` → `BSKY_BOT_HANDLE`/`BSKY_BOT_PWD`. Update your deployment config when upgrading or bot fact-check links (`/statusFake`) will be missing.
+* **Notifications** — add a Prüfpunkt push-notification opt-in (`new_pruefpunkt`), registered via the existing settings payload (older clients that omit the key keep their current value); the new-post webhook now derives the source site from the post permalink and routes Prüfpunkt posts to the opted-in device cohort ([#2](https://github.com/Volksverpetzer/vvp_app_server/issues/2))
+* **Analytics** — the Plausible `links` endpoint is now site-aware, selecting the Plausible site via `?site=` instead of being pinned to `volksverpetzer.de` ([#12](https://github.com/Volksverpetzer/vvp_app_server/issues/12))
+
+
+### Bug Fixes
+
+* **Instagram** — return `502` instead of a cacheable `200` when the Instagram API still errors after the token-refresh retry, so a failed fetch is no longer masqueraded as success ([#4](https://github.com/Volksverpetzer/vvp_app_server/issues/4))
+* **Cache** — never cache upstream error responses returned as HTTP `200` with an `{"error": ...}` body, preventing a transient upstream error from being pinned for the full cache TTL ([#9](https://github.com/Volksverpetzer/vvp_app_server/issues/9))
+* **Cache** — replay cached non-dict (list) bodies with `safe=False`; a cache hit on a list feed payload previously raised `TypeError` instead of serving the cached response ([#3](https://github.com/Volksverpetzer/vvp_app_server/issues/3))
+* **Instagram** — update the active token row per account in `initializeToken` instead of inserting a new row on every re-init, so repeated upstream errors no longer grow the `InstaToken` table ([#5](https://github.com/Volksverpetzer/vvp_app_server/issues/5))
+
+
+### Chores
+
+* Remove the unused `instaMemeFeed` endpoint — the meme feed is no longer used by the app ([#1](https://github.com/Volksverpetzer/vvp_app_server/issues/1))
+* **Tests** — cover the partial-token-refresh fallback to the per-account env token ([#6](https://github.com/Volksverpetzer/vvp_app_server/issues/6))
+* **CI** — scope the workflow `GITHUB_TOKEN` to `contents: read` ([#10](https://github.com/Volksverpetzer/vvp_app_server/issues/10))
+* **CI** — bump `actions/checkout` from 6 to 7 ([#8](https://github.com/Volksverpetzer/vvp_app_server/issues/8))
+* Add MIT license
+
+
 # [1.1.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.0.1...v1.1.0) (2026-06-11)
 
 

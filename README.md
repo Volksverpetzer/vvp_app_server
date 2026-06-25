@@ -32,7 +32,7 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 | `POST` | `/paymentIntent` | payment | Create Stripe payment intent |
 | `GET` | `/proxy/instaFeed` | proxycache | Instagram feed (`?account=volksverpetzer\|pruefpunkt`) |
 | `GET` | `/proxy/instaById/<id>` | proxycache | Single Instagram post |
-| `GET` | `/proxy/blueskyFeed` | proxycache | Bluesky feed (`?account=volksverpetzer\|pruefpunkt`) |
+| `GET` | `/proxy/blueskyFeed` | proxycache | Bluesky feed (`?account=volksverpetzer\|pruefpunkt\|bot`) |
 | `GET` | `/proxy/tiktokFeed` | proxycache | TikTok feed |
 | `GET` | `/proxy/ytAPI` | proxycache | YouTube feed |
 | `GET` | `/proxy/media_url` | proxycache | Resolve and proxy external media |

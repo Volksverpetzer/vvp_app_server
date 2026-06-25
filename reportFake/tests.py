@@ -148,10 +148,24 @@ class ReportFakeViewsTest(TestCase):
         report = FakeReport.objects.create(
             description="d", url="u", more_info="m", post_id="abc"
         )
-        response = self.client.get(f"/statusFake/{report.id}")
+        with patch.dict(os.environ, {"BSKY_BOT_HANDLE": "bot.example.com"}):
+            response = self.client.get(f"/statusFake/{report.id}")
         data = json.loads(response.content)
         self.assertEqual(data["status"], "posted")
-        self.assertIn("https://bsky.app", data["url"])
+        self.assertEqual(
+            data["url"], "https://bsky.app/profile/bot.example.com/post/abc"
+        )
+
+    def test_statusFake_url_none_when_bot_handle_missing(self):
+        report = FakeReport.objects.create(
+            description="d", url="u", more_info="m", post_id="abc"
+        )
+        env = {k: v for k, v in os.environ.items() if k != "BSKY_BOT_HANDLE"}
+        with patch.dict(os.environ, env, clear=True):
+            response = self.client.get(f"/statusFake/{report.id}")
+        data = json.loads(response.content)
+        self.assertEqual(data["status"], "posted")
+        self.assertIsNone(data["url"])
 
     def test_archiveFake_post_archives_report(self):
         report = FakeReport.objects.create(

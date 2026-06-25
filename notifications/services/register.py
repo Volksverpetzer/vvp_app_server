@@ -21,7 +21,7 @@ def register(request: HttpRequest) -> JsonResponse:
             key: "value".
 
     Returns:
-        JSONResponse: 200 if sucess, 403 if not
+        JsonResponse: 200 if success, 403 if not
     """
     try:
         data = json.loads(request.body)
