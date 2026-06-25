@@ -2,7 +2,10 @@ name: Test and Release
 on:
   push:
     branches:
-      - '*'
+      - '**'
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -20,7 +23,7 @@ jobs:
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - name: ⬇️ Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -45,10 +48,6 @@ jobs:
           PLAUSIBLE_TOKEN: ${{ secrets.PLAUSIBLE_TOKEN }}
           GOOGLE_FACT: ${{ secrets.GOOGLE_FACT }}
           YT_ACCESS_TOKEN: ${{ secrets.YT_ACCESS_TOKEN }}
-          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
-          EMAIL_PORT: ${{ secrets.EMAIL_PORT }}
-          EMAIL_HOST_USER: ${{ secrets.EMAIL_HOST_USER }}
-          EMAIL_HOST_PASSWORD: ${{ secrets.EMAIL_HOST_PASSWORD }}
 
   docker-build:
     runs-on: ubuntu-latest
@@ -57,7 +56,7 @@ jobs:
       image_tag: ${{ steps.vars.outputs.image_tag }}
     steps:
       - name: ⬇️ Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set image tag
         id: vars

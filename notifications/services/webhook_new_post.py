@@ -2,6 +2,7 @@ import html
 import json
 import logging
 import os
+from urllib.parse import urlparse
 
 import requests
 from django.core.paginator import Paginator
@@ -18,6 +19,35 @@ from django_q.tasks import (  # type: ignore[reportMissingTypeStubs]
 from notifications.models import NotificationDevice
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SITE = "volksverpetzer.de"
+
+# WordPress sites that may fire the new-post webhook. The source site is
+# derived from the post permalink's domain (see _resolve_site). Each site has
+# its own WP REST base (used to re-fetch the authoritative post) and the app
+# name shown in the notification title.
+SITES = {
+    "volksverpetzer.de": {
+        "wp_base": "https://volksverpetzer.de",
+        "app_name": "Volksverpetzer",
+    },
+    "pruefpunkt.org": {
+        "wp_base": "https://www.pruefpunkt.org",
+        "app_name": "Prüfpunkt",
+    },
+}
+
+
+def _resolve_site(permalink: str) -> str:
+    """Map a post permalink's domain to a configured site key.
+
+    Falls back to DEFAULT_SITE when the permalink is missing or its domain is
+    not configured, preserving single-site behavior.
+    """
+    host = (urlparse(permalink).hostname or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host if host in SITES else DEFAULT_SITE
 
 
 @csrf_exempt
@@ -56,10 +86,11 @@ def webhook_new_post(request: HttpRequest):
     if not isinstance(post_name, str) or not post_name.strip():
         return JsonResponse({"error": "missing post.post_name"}, status=400)
     slug = post_name.strip()
-    wpUrl = (
-        os.environ["WP_URL"] if "WP_URL" in os.environ else "https://volksverpetzer.de"
-    )
-    appName = os.environ["APP_NAME"] if "APP_NAME" in os.environ else "Volksverpetzer"
+    permalink = data.get("post_permalink")
+    site = _resolve_site(permalink if isinstance(permalink, str) else "")
+    cfg = SITES[site]
+    wpUrl = cfg["wp_base"]
+    appName = cfg["app_name"]
     try:
         response = requests.get(
             wpUrl + "/wp-json/wp/v2/posts/",
@@ -94,7 +125,12 @@ def webhook_new_post(request: HttpRequest):
     category_raw = taxonomies.get("category") if isinstance(taxonomies, dict) else None
     categories = category_raw if isinstance(category_raw, dict) else {}
     isFactCheck = "faktencheck" in categories
-    if isFactCheck:
+    # Audience: pruefpunkt posts go to devices opting into pruefpunkt; for
+    # volksverpetzer keep the existing fact-check vs. new-post split. The title
+    # label (Faktencheck/Beitrag) follows the category for both sites.
+    if site == "pruefpunkt.org":
+        qs = qs.filter(notification_new_pruefpunkt=True)
+    elif isFactCheck:
         qs = qs.filter(notification_new_fact_check=True)
     else:
         qs = qs.filter(notification_new_post=True)

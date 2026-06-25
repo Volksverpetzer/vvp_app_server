@@ -24,17 +24,15 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 | `POST` | `/archiveFake` | reportFake | Archive a report |
 | `POST` | `/assign-bluesky` | reportFake | Assign Bluesky post to report |
 | `GET` | `/statusFake/<uuid>` | reportFake | Check report status |
-| `GET` | `/botFeed` | reportFake | Bluesky bot reply feed |
 | `POST` | `/register` | notifications | Register device for push notifications |
 | `POST` | `/webhook_new_post` | notifications | Trigger push notifications for a new post |
 | `POST` | `/notification_stats` | notifications | Push notification delivery stats |
 | `GET` | `/task_monitor` | notifications | Django-Q task queue status |
 | `GET` | `/receipts_monitor` | notifications | Push receipt monitoring |
 | `POST` | `/paymentIntent` | payment | Create Stripe payment intent |
-| `GET` | `/proxy/instaFeed` | proxycache | Instagram main-account feed |
-| `GET` | `/proxy/instaMemeFeed` | proxycache | Instagram meme-account feed |
+| `GET` | `/proxy/instaFeed` | proxycache | Instagram feed (`?account=volksverpetzer\|pruefpunkt`) |
 | `GET` | `/proxy/instaById/<id>` | proxycache | Single Instagram post |
-| `GET` | `/proxy/blueskyFeed` | proxycache | Bluesky feed |
+| `GET` | `/proxy/blueskyFeed` | proxycache | Bluesky feed (`?account=volksverpetzer\|pruefpunkt\|bot`) |
 | `GET` | `/proxy/tiktokFeed` | proxycache | TikTok feed |
 | `GET` | `/proxy/ytAPI` | proxycache | YouTube feed |
 | `GET` | `/proxy/media_url` | proxycache | Resolve and proxy external media |
@@ -57,17 +55,18 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `DATABASE_URL` | PostgreSQL connection string (e.g. `postgres://user:pass@host:5432/db`) |
 | `DB_SSLMODE` | SSL mode for DB connection (`require`, `disable`, …) |
 | `DB_SSLROOTCERT` | Path to SSL root certificate |
-| `APP_NAME` | Display name used in push notification messages |
 | `EXPO_TOKEN` | Expo push notification server token |
 | `NOTIFICATION_BEARER` | Bearer token to authenticate incoming webhook calls |
 | `GOOGLE_FACT` | Google Fact Check API key |
 | `STRIPE_SECRET_KEY` | Stripe live secret key |
-| `INSTAGRAM_ACCESS_TOKEN` | Instagram Graph API token (main account) |
-| `INSTAGRAM_MEME_TOKEN` | Instagram Graph API token (meme account) |
-| `BSKY_HANDLE` | Bluesky handle for feed fetching |
-| `BSKY_PWD` | Bluesky password for feed fetching |
-| `BOT_BSKY_HANDLE` | Bluesky bot account handle (fact-check replies) |
-| `BOT_BSKY_PWD` | Bluesky bot account password |
+| `INSTAGRAM_ACCESS_TOKEN` | Instagram Graph API token (volksverpetzer account) |
+| `INSTAGRAM_ACCESS_TOKEN_PRUEFPUNKT` | Instagram Graph API token (pruefpunkt account) |
+| `BSKY_HANDLE` | Bluesky handle for feed fetching (volksverpetzer) |
+| `BSKY_PWD` | Bluesky password for feed fetching (volksverpetzer) |
+| `BSKY_HANDLE_PRUEFPUNKT` | Bluesky handle for feed fetching (pruefpunkt, optional) |
+| `BSKY_PWD_PRUEFPUNKT` | Bluesky password for feed fetching (pruefpunkt, optional) |
+| `BSKY_BOT_HANDLE` | Bluesky bot account handle (fact-check replies) |
+| `BSKY_BOT_PWD` | Bluesky bot account password |
 | `TIKTOK_CLIENT_KEY` | TikTok API client key |
 | `TIKTOK_CLIENT_SECRET` | TikTok API client secret |
 | `TIKTOK_REFRESH_TOKEN` | TikTok OAuth refresh token (fallback when no DB token exists) |
@@ -76,7 +75,6 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `MAILGUN_TOKEN` | Mailgun API token |
 | `MAILGUN_RECEIVER` | Email address to receive fake-report notifications |
 | `PLAUSIBLE_TOKEN` | Plausible Analytics API token |
-| `WP_URL` | WordPress site URL for new-post webhooks |
 
 ## Local Development
 

@@ -38,7 +38,9 @@ def cache_response(key_fn: Callable[..., str], timeout: int):
             key = key_fn(request, *args, **kwargs)
             data = cache_get(key)
             if data is not None:
-                resp = JsonResponse(data)
+                # safe=False: cached bodies may be lists (views using
+                # JsonResponse(..., safe=False)), not only dicts
+                resp = JsonResponse(data, safe=False)
                 # edge cache: public GET with TTL
                 ttl = (
                     timeout(request, *args, **kwargs) if callable(timeout) else timeout
@@ -52,6 +54,10 @@ def cache_response(key_fn: Callable[..., str], timeout: int):
             try:
                 body = json.loads(response.content)
             except Exception:
+                return response
+            # upstream errors are returned as 200 with an {"error": ...} body
+            # (e.g. invalidated Instagram tokens); never cache those
+            if isinstance(body, dict) and "error" in body:
                 return response
             # Determine dynamic timeout if callable
             actual_timeout = (

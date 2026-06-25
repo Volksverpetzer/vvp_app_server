@@ -50,12 +50,52 @@ class ProxyTest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "pp_token")
 
+    def test_cache_response_skips_error_bodies(self):
+        # An upstream that returns a 200 body containing an "error" key (e.g.
+        # Bluesky) must not be cached and replayed. Tested at the cache layer
+        # directly, independent of any view's status-code handling.
+        from django.http import JsonResponse
+
+        from vvp_app_server.cache_utils import cache_response
+
+        calls = {"n": 0}
+
+        @cache_response(lambda request, *a, **k: request.get_full_path(), 600)
+        def view(request):
+            calls["n"] += 1
+            return JsonResponse({"error": {"code": 190}})
+
+        req = RequestFactory().get("/dummy-error-cache-test")
+        view(req)
+        view(req)
+        # error body not cached: the wrapped view is re-invoked each time
+        self.assertEqual(calls["n"], 2)
+
     def test_insta_invalid_account(self):
         response = self.c.get("/proxy/instaFeed?account=unknown")
         self.assertEqual(response.status_code, 400)
         # error responses must not be cached and replayed as 200
         response2 = self.c.get("/proxy/instaFeed?account=unknown")
         self.assertEqual(response2.status_code, 400)
+
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    @patch("proxycache.services.insta_feed.requests.get")
+    def test_insta_upstream_error_returns_502(self, mock_get, mock_refresh):
+        # upstream keeps returning an error even after the token retry
+        mock_get.return_value.json.return_value = {"error": {"code": 190}}
+        mock_refresh.return_value = ("new_token", 3600)  # nosec
+        response = self.c.get("/proxy/instaFeed?case=upstream-error")
+        self.assertEqual(response.status_code, 502)
+        # the retry refreshed the token once
+        self.assertEqual(mock_get.call_count, 2)
+
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    @patch("proxycache.services.insta_feed.requests.get")
+    def test_insta_by_id_upstream_error_returns_502(self, mock_get, mock_refresh):
+        mock_get.return_value.json.return_value = {"error": {"code": 190}}
+        mock_refresh.return_value = ("new_token", 3600)  # nosec
+        response = self.c.get("/proxy/instaById/999?case=upstream-error")
+        self.assertEqual(response.status_code, 502)
 
     @patch("proxycache.services.insta_feed.refreshInstaToken")
     @patch("proxycache.services.insta_feed.requests.get")
@@ -70,6 +110,21 @@ class ProxyTest(TestCase):
         response = self.c.get("/proxy/instaById/123?account=pruefpunkt")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "pp_token")
+
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    def test_initialize_token_updates_existing_row(self, mock_refresh):
+        from proxycache.services.insta_feed import initializeToken
+
+        mock_refresh.return_value = ("first_token", 3600)  # nosec
+        initializeToken()
+        mock_refresh.return_value = ("second_token", 3600)  # nosec
+        initializeToken()
+        tokens = InstaToken.objects.filter(account="volksverpetzer")
+        self.assertEqual(tokens.count(), 1)
+        self.assertEqual(tokens.get().token, "second_token")
+        # other accounts get their own row
+        initializeToken("pruefpunkt")
+        self.assertEqual(InstaToken.objects.count(), 2)
 
     @patch("proxycache.services.insta_feed.requests.get")
     def test_insta_env_token_fallback_per_account(self, mock_get):
@@ -94,6 +149,19 @@ class ProxyTest(TestCase):
             self.assertEqual(
                 mock_get.call_args[1]["params"]["access_token"], "pp_env_token"
             )
+
+    @patch("proxycache.services.insta_feed.refreshInstaToken")
+    def test_get_token_partial_refresh_falls_back_to_env(self, mock_refresh):
+        from proxycache.services.insta_feed import getToken
+
+        # expired stored token
+        InstaToken.objects.create(token="stale_token", expires_in=0)  # nosec
+        # refresh returns a token but no expires_in
+        mock_refresh.return_value = ("half_refreshed", None)  # nosec
+        with patch.dict(os.environ, {"INSTAGRAM_ACCESS_TOKEN": "env_token"}):
+            self.assertEqual(getToken(), "env_token")
+        # the stored row was not corrupted by the partial refresh result
+        self.assertEqual(InstaToken.objects.get().token, "stale_token")
 
     def test_tiktok(self):
         # mock tiktok API request
@@ -401,6 +469,34 @@ class AnalyticsLinksTest(TestCase, Client):
         # result should map dimensions to url
         expected = {"links": [{"visitors": 5, "url": page}]}
         self.assertEqual(response.json(), expected)
+        # no site param defaults to the primary site
+        self.assertEqual(mock_post.call_args[1]["json"]["site_id"], "volksverpetzer.de")
+
+    @patch("proxycache.services.analytics.cache_get", return_value=None)
+    @patch("proxycache.services.analytics.cache_set")
+    @patch("proxycache.services.analytics.requests.post")
+    def test_links_view_pruefpunkt_site(
+        self, mock_post: MagicMock, mock_cache_set: MagicMock, mock_cache_get: MagicMock
+    ):
+        page = "/foo/bar/"
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "results": [{"metrics": [5], "dimensions": [page]}]
+        }
+        mock_post.return_value = mock_resp
+
+        url = reverse("links", args=["foo/bar"]) + "?site=pruefpunkt.org"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_post.call_args[1]["json"]["site_id"], "pruefpunkt.org")
+
+    @patch.dict(os.environ, {"PLAUSIBLE_TOKEN": "test"})  # nosec
+    def test_links_view_invalid_site_returns_400(self):
+        url = reverse("links", args=["foo/bar"]) + "?site=evil.com"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json(), {"error": "invalid site"})
 
 
 class AnalyticsMapTest(TestCase):
@@ -439,6 +535,30 @@ class CacheUtilsTest(TestCase):
         self.assertEqual(result, {"x": 1})
         self.assertEqual(caches["default"].get(key), {"x": 1})
 
+    def test_cache_response_replays_list_body(self):
+        import json
+
+        from django.http import JsonResponse
+        from django.test import RequestFactory
+        from vvp_app_server.cache_utils import cache_response
+
+        calls = []
+
+        @cache_response(lambda req: "list_body_key", 60)
+        def list_view(request):
+            calls.append(1)
+            return JsonResponse([1, 2], safe=False)
+
+        rf = RequestFactory()
+        response = list_view(rf.get("/"))
+        self.assertEqual(json.loads(response.content), [1, 2])
+        # second call is served from the cache and must not crash on the
+        # non-dict body
+        response2 = list_view(rf.get("/"))
+        self.assertEqual(response2.status_code, 200)
+        self.assertEqual(json.loads(response2.content), [1, 2])
+        self.assertEqual(len(calls), 1)
+
     def test_cache_response_non_json_passes_through(self):
         from django.http import HttpResponse
         from django.test import RequestFactory
@@ -453,30 +573,6 @@ class CacheUtilsTest(TestCase):
         response = binary_view(request)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content, b"\x89PNG")
-
-
-class InstaMemeTest(TestCase):
-    def setUp(self):
-        self.client = Client()
-
-    @patch("proxycache.services.insta_meme_feed.requests.get")
-    @patch.dict(os.environ, {"INSTAGRAM_MEME_TOKEN": "test_token"})  # nosec
-    def test_insta_meme_feed_success(self, mock_get):
-        mock_get.return_value.json.return_value = {
-            "data": [{"id": "1", "media_url": "https://example.com/img.jpg"}]
-        }
-        response = self.client.get("/proxy/instaMemeFeed")
-        self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertIn("data", data)
-
-    @patch("proxycache.services.insta_meme_feed.requests.get")
-    @patch.dict(os.environ, {"INSTAGRAM_MEME_TOKEN": "test_token"})  # nosec
-    def test_insta_meme_feed_api_error_returns_empty(self, mock_get):
-        mock_get.return_value.json.return_value = {"error": {"message": "API error"}}
-        response = self.client.get("/proxy/instaMemeFeed")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), {"data": []})
 
 
 class TiktokHelperTest(TestCase):
@@ -522,3 +618,45 @@ class TiktokHelperTest(TestCase):
         }
         token = getTiktokToken()
         self.assertEqual(token, "refreshed")
+
+
+class BlueskyFeedAccountTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+
+    @patch("proxycache.services.bluesky_feed.Client")
+    def test_default_account_uses_vvp_env(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:vvp")
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
+        with patch.dict(os.environ, {"BSKY_HANDLE": "vvp.bsky.social", "BSKY_PWD": "vvp_pass"}):  # nosec
+            response = self.client.get("/proxy/blueskyFeed")
+        self.assertEqual(response.status_code, 200)
+        mock_client.login.assert_called_once_with("vvp.bsky.social", "vvp_pass")
+
+    @patch("proxycache.services.bluesky_feed.Client")
+    def test_pruefpunkt_account_uses_pruefpunkt_env(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:pp")
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
+        with patch.dict(os.environ, {"BSKY_HANDLE_PRUEFPUNKT": "pp.bsky.social", "BSKY_PWD_PRUEFPUNKT": "pp_pass"}):  # nosec
+            response = self.client.get("/proxy/blueskyFeed?account=pruefpunkt&cachebust=pp")
+        self.assertEqual(response.status_code, 200)
+        mock_client.login.assert_called_once_with("pp.bsky.social", "pp_pass")
+
+    @patch("proxycache.services.bluesky_feed.Client")
+    def test_bot_account_uses_bot_env(self, mock_client_cls):
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:bot")
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
+        with patch.dict(os.environ, {"BSKY_BOT_HANDLE": "bot.bsky.social", "BSKY_BOT_PWD": "bot_pass"}):  # nosec
+            response = self.client.get("/proxy/blueskyFeed?account=bot&cachebust=bot")
+        self.assertEqual(response.status_code, 200)
+        mock_client.login.assert_called_once_with("bot.bsky.social", "bot_pass")
+
+    def test_invalid_account_returns_400(self):
+        response = self.client.get("/proxy/blueskyFeed?account=unknown&cachebust=inv")
+        self.assertEqual(response.status_code, 400)

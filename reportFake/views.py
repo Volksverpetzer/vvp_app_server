@@ -6,7 +6,6 @@ import os
 import uuid
 
 import requests
-from atproto import Client  # type: ignore[reportMissingTypeStubs]
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, JsonResponse
@@ -182,34 +181,14 @@ def statusFake(request: HttpRequest, report_id: uuid.UUID):
     if not report:
         return JsonResponse({"error": "Not found"}, status=404)
     status = "posted" if report.post_id else "pending"
-    handle = os.environ.get("BOT_BSKY_HANDLE", "")
-    url = report.post_id and (
-        f"https://bsky.app/profile/{handle}/post/" f"{report.post_id}"
+    handle = os.environ.get("BSKY_BOT_HANDLE", "")
+    # Only build a URL when both the post id and the bot handle are known;
+    # otherwise we'd produce an invalid ".../profile//post/..." link.
+    url = (
+        f"https://bsky.app/profile/{handle}/post/{report.post_id}"
+        if report.post_id and handle
+        else None
     )
     return JsonResponse({"id": report.id, "status": status, "url": url})
 
 
-def botFeed(request: HttpRequest):
-    """Fetch and return bot's Bluesky posts."""
-    BOT_HANDLE = os.environ.get("BOT_BSKY_HANDLE", "")
-    BOT_PWD = os.environ.get("BOT_BSKY_PWD", "")
-    client = Client()
-    client.login(BOT_HANDLE, BOT_PWD)
-    did = client.com.atproto.identity.resolve_handle({"handle": BOT_HANDLE}).did
-    feed = []
-    resp1 = client.app.bsky.feed.get_author_feed({"actor": did, "limit": 100})
-    feed.extend(resp1.feed)
-    if resp1.cursor:
-        resp2 = client.app.bsky.feed.get_author_feed(
-            {"actor": did, "limit": 100, "cursor": resp1.cursor}
-        )
-        feed.extend(resp2.feed)
-    # filter out reposts
-    from atproto_client.models.app.bsky.feed.defs import (  # type: ignore[reportMissingTypeStubs]
-        ReasonRepost,
-    )
-
-    posts = [
-        item.model_dump() for item in feed if not isinstance(item.reason, ReasonRepost)
-    ]
-    return JsonResponse({"feed": posts})

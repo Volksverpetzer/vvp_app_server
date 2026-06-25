@@ -148,10 +148,24 @@ class ReportFakeViewsTest(TestCase):
         report = FakeReport.objects.create(
             description="d", url="u", more_info="m", post_id="abc"
         )
-        response = self.client.get(f"/statusFake/{report.id}")
+        with patch.dict(os.environ, {"BSKY_BOT_HANDLE": "bot.example.com"}):
+            response = self.client.get(f"/statusFake/{report.id}")
         data = json.loads(response.content)
         self.assertEqual(data["status"], "posted")
-        self.assertIn("https://bsky.app", data["url"])
+        self.assertEqual(
+            data["url"], "https://bsky.app/profile/bot.example.com/post/abc"
+        )
+
+    def test_statusFake_url_none_when_bot_handle_missing(self):
+        report = FakeReport.objects.create(
+            description="d", url="u", more_info="m", post_id="abc"
+        )
+        env = {k: v for k, v in os.environ.items() if k != "BSKY_BOT_HANDLE"}
+        with patch.dict(os.environ, env, clear=True):
+            response = self.client.get(f"/statusFake/{report.id}")
+        data = json.loads(response.content)
+        self.assertEqual(data["status"], "posted")
+        self.assertIsNone(data["url"])
 
     def test_archiveFake_post_archives_report(self):
         report = FakeReport.objects.create(
@@ -196,22 +210,3 @@ class ReportFakeViewsTest(TestCase):
         response = ratelimit_view(request, Exception("rate limited"))
         self.assertEqual(response.status_code, 429)
 
-    @patch("reportFake.views.Client")
-    def test_botFeed(self, mock_client_cls: MagicMock) -> None:
-        mock_client = MagicMock()
-        mock_client_cls.return_value = mock_client
-        item = MagicMock()
-        item.reason = None
-        item.model_dump.return_value = {"uri": "at://actor/123"}
-        resp1 = MagicMock(cursor="cur", feed=[item])
-        resp2 = MagicMock(cursor=None, feed=[item])
-        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(
-            did="did"
-        )
-        mock_client.app.bsky.feed.get_author_feed.side_effect = [resp1, resp2]
-        response = self.client.get("/botFeed")
-
-        data = json.loads(response.content)
-        self.assertEqual(
-            data["feed"], [{"uri": "at://actor/123"}, {"uri": "at://actor/123"}]
-        )

@@ -240,6 +240,120 @@ class TestNotification(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("missing post.post_name", response.json()["error"])
 
+    def test_register_accepts_pruefpunkt_setting(self):
+        response = self.c.post(
+            "/register",
+            {
+                "expo_token": "ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]",
+                "settings": {
+                    "new_post": {"value": False},
+                    "new_fact_check": {"value": True},
+                    "new_pruefpunkt": {"value": True},
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        device = NotificationDevice.objects.get(
+            expo_token="ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]"
+        )
+        self.assertTrue(device.notification_new_pruefpunkt)
+
+    def test_register_without_pruefpunkt_keeps_default(self):
+        # Older app versions omit new_pruefpunkt; field stays at its default.
+        response = self.c.post(
+            "/register",
+            {
+                "expo_token": "ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]",
+                "settings": {
+                    "new_post": {"value": True},
+                    "new_fact_check": {"value": True},
+                },
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        device = NotificationDevice.objects.get(
+            expo_token="ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]"
+        )
+        self.assertFalse(device.notification_new_pruefpunkt)
+
+    def test_pruefpunkt_post_targets_pruefpunkt_devices(self):
+        pp_device = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[ppDeviceTokenAAAAAAAA]",
+            notification_new_post=False,
+            notification_new_fact_check=False,
+            notification_new_pruefpunkt=True,
+        )
+        pp_post = {
+            **example_post,
+            "post_permalink": "https://www.pruefpunkt.org/some/article/",
+        }
+        mock_post = {
+            "link": "https://www.pruefpunkt.org/some/article/",
+            "title": {"rendered": "PP Test"},
+            "yoast_head_json": {},
+        }
+        found_response = MagicMock()
+        found_response.json.return_value = [mock_post]
+        with patch(
+            "notifications.services.webhook_new_post.requests.get",
+            return_value=found_response,
+        ), patch(
+            "notifications.services.webhook_new_post.async_task"
+        ) as mock_async:
+            response = self.c.post(
+                "/webhook_new_post",
+                data=pp_post,
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mock_async.called)
+        args = mock_async.call_args.args
+        devices, heading = args[1], args[2]
+        self.assertTrue(heading.startswith("Prüfpunkt"))
+        tokens = {d.expo_token for d in devices}
+        self.assertIn(pp_device.expo_token, tokens)
+        # volksverpetzer devices (pruefpunkt off by default) must be excluded
+        self.assertNotIn("ExponentPushToken[WKgPMINOj-poMgtFJAJARh]", tokens)
+
+    def test_volksverpetzer_post_targets_post_devices(self):
+        pp_device = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[ppDeviceTokenBBBBBBBB]",
+            notification_new_post=False,
+            notification_new_fact_check=False,
+            notification_new_pruefpunkt=True,
+        )
+        mock_post = {
+            "link": "https://www.volksverpetzer.de/test/",
+            "title": {"rendered": "Test"},
+            "yoast_head_json": {},
+        }
+        found_response = MagicMock()
+        found_response.json.return_value = [mock_post]
+        with patch(
+            "notifications.services.webhook_new_post.requests.get",
+            return_value=found_response,
+        ), patch(
+            "notifications.services.webhook_new_post.async_task"
+        ) as mock_async:
+            response = self.c.post(
+                "/webhook_new_post",
+                data=example_post,
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(mock_async.called)
+        args = mock_async.call_args.args
+        devices, heading = args[1], args[2]
+        self.assertTrue(heading.startswith("Volksverpetzer"))
+        tokens = {d.expo_token for d in devices}
+        self.assertIn("ExponentPushToken[WKgPMINOj-poMgtFJAJARh]", tokens)
+        # pruefpunkt-only device must not get the volksverpetzer post
+        self.assertNotIn(pp_device.expo_token, tokens)
+
 
 class NotificationStatsTest(TestCase):
     def setUp(self):

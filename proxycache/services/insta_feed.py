@@ -51,6 +51,10 @@ def instaFeed(request: HttpRequest) -> JsonResponse | HttpResponse:
             raw_data = response.json()
     except (requests.exceptions.RequestException, ValueError):
         return HttpResponse(status=502)
+    if isinstance(raw_data, dict) and "error" in raw_data:
+        # the token refresh did not help: don't serve the upstream error
+        # payload as a cacheable 200
+        return HttpResponse(status=502)
     if not isinstance(raw_data, dict):
         # return error
         return HttpResponse(status=500)
@@ -83,6 +87,10 @@ def instaById(request: HttpRequest, id: str) -> JsonResponse | HttpResponse:
             raw_data = response.json()
     except (requests.exceptions.RequestException, ValueError):
         return HttpResponse(status=502)
+    if isinstance(raw_data, dict) and "error" in raw_data:
+        # the token refresh did not help: don't serve the upstream error
+        # payload as a cacheable 200
+        return HttpResponse(status=502)
     if not isinstance(raw_data, dict):
         return JsonResponse(raw_data, safe=False)
     raw_data["timestamp"] = time.time()
@@ -108,11 +116,18 @@ def refreshInstaToken(
 
 
 def initializeToken(account: str = DEFAULT_ACCOUNT):
-    """Initialize Instagram token of the account in DB."""
+    """Initialize or update the Instagram token of the account in DB."""
     token, expires = refreshInstaToken(account=account)
     if not token or not expires:
         return
-    InstaToken.objects.create(token=token, expires_in=expires, account=account)
+    # update the active row instead of growing the table on every re-init
+    # (e.g. when the views re-initialize on repeated upstream errors)
+    obj = InstaToken.objects.filter(account=account).order_by("date").last()
+    if obj:
+        obj.token, obj.expires_in = token, expires
+        obj.save()
+    else:
+        InstaToken.objects.create(token=token, expires_in=expires, account=account)
 
 
 def getToken(account: str = DEFAULT_ACCOUNT):

@@ -114,6 +114,9 @@ def shares(request: HttpRequest, path: Optional[str] = None) -> HttpResponse:
 
 @require_http_methods(["GET"])
 def links(request: HttpRequest, remaining: str) -> HttpResponse:
+    site, err = _resolve_site(request)
+    if err:
+        return err
     cache_key = "analytics:links:" + request.get_full_path()
     entry = cache_get(cache_key)
     cached_data = entry.get("data") if entry else None
@@ -129,7 +132,7 @@ def links(request: HttpRequest, remaining: str) -> HttpResponse:
         # Use Plausible v2 breakdown endpoint with required period parameter
         url = "https://plausible.io/api/v2/query"
         payload = {
-            "site_id": "volksverpetzer.de",
+            "site_id": site,
             "metrics": ["events"],
             "dimensions": ["event:props:url"],
             "date_range": "all",

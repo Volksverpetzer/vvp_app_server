@@ -6,14 +6,38 @@ from django.http import HttpRequest, JsonResponse
 
 from vvp_app_server.cache_utils import cache_response
 
+DEFAULT_ACCOUNT = "volksverpetzer"
+
+ACCOUNTS = {
+    "volksverpetzer": {"handle_env": "BSKY_HANDLE", "pwd_env": "BSKY_PWD"},
+    "pruefpunkt": {"handle_env": "BSKY_HANDLE_PRUEFPUNKT", "pwd_env": "BSKY_PWD_PRUEFPUNKT"},
+    "bot": {"handle_env": "BSKY_BOT_HANDLE", "pwd_env": "BSKY_BOT_PWD"},
+}
+
+
+def _resolve_account(request: HttpRequest) -> tuple[str, JsonResponse | None]:
+    account = request.GET.get("account", DEFAULT_ACCOUNT)
+    if account not in ACCOUNTS:
+        return "", JsonResponse({"error": "invalid account"}, status=400)
+    return account, None
+
 
 @cache_response(lambda request, *args, **kwargs: request.get_full_path(), 60 * 10)
 def blueskyFeed(request: HttpRequest):
-    USERNAME = os.environ["BSKY_HANDLE"]
-    PASSWORD = os.environ["BSKY_PWD"]
+    account, err = _resolve_account(request)
+    if err:
+        return err
+    cfg = ACCOUNTS[account]
+    handle = os.environ.get(cfg["handle_env"])
+    password = os.environ.get(cfg["pwd_env"])
+    if not handle or not password:
+        # The account is known but its credentials aren't configured on this
+        # deployment (e.g. the optional pruefpunkt/bot accounts). Return a
+        # controlled error instead of an uncaught KeyError / 500.
+        return JsonResponse({"error": "account not configured"}, status=503)
     client = Client()
-    client.login(USERNAME, PASSWORD)
-    did = client.com.atproto.identity.resolve_handle({"handle": USERNAME}).did
+    client.login(handle, password)
+    did = client.com.atproto.identity.resolve_handle({"handle": handle}).did
     feed_1 = client.app.bsky.feed.get_author_feed({"actor": did, "limit": 100})
     feed_2 = client.app.bsky.feed.get_author_feed(
         {"actor": did, "limit": 100, "cursor": feed_1.cursor}
