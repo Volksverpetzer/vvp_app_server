@@ -4,6 +4,8 @@
 ### Features
 
 * **Bluesky** — support multiple accounts in the bluesky proxy via `?account=` (mirrors the Instagram multi-account support); removed the unused `botFeed` endpoint ([#2](https://github.com/Volksverpetzer/vvp_app_server/issues/2))
+* **Notifications** — add a Prüfpunkt push-notification opt-in (`new_pruefpunkt`), registered via the existing settings payload (older clients that omit the key keep their current value); the new-post webhook now derives the source site from the post permalink and routes Prüfpunkt posts to the opted-in device cohort ([#2](https://github.com/Volksverpetzer/vvp_app_server/issues/2))
+* **Analytics** — the Plausible `links` endpoint is now site-aware, selecting the Plausible site via `?site=` instead of being pinned to `volksverpetzer.de` ([#12](https://github.com/Volksverpetzer/vvp_app_server/issues/12))
 
 
 ### Bug Fixes
