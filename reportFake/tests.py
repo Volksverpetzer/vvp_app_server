@@ -18,7 +18,10 @@ class Notification(TestCase):
         self.c = Client(enforce_csrf_checks=True)
 
     @override_settings(RATELIMIT_ENABLE=False)
-    def test_send_report(self):
+    @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
+    @patch("contact.asana.requests.post")
+    def test_send_report(self, mock_post: MagicMock):
+        mock_post.return_value = MagicMock(status_code=201, text="")
         response = self.c.post(
             "/reportFake",
             {
@@ -29,7 +32,11 @@ class Notification(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(json.loads(response.content)["success"])
         self.assertEqual(FakeReport.objects.filter(url="https://welt.de").exists(), True)
+        # The legacy endpoint posts to the same Asana board as the contact app
+        payload = mock_post.call_args.kwargs["json"]["data"]
+        self.assertEqual(payload["name"], "Fake-Report | https://welt.de")
 
     @override_settings(RATELIMIT_ENABLE=False)
     def test_send_report_invalid_url_scheme(self):
@@ -75,7 +82,7 @@ class Notification(TestCase):
 
     @override_settings(RATELIMIT_ENABLE=False)
     @patch.dict(os.environ, {}, clear=True)
-    def test_send_report_missing_mailgun_env_returns_failure(self):
+    def test_send_report_missing_asana_env_returns_failure(self):
         response = self.c.post(
             "/reportFake",
             {"description": "d", "url": "https://example.com", "more_info": "m"},
@@ -85,12 +92,10 @@ class Notification(TestCase):
         self.assertFalse(json.loads(response.content)["success"])
 
     @override_settings(RATELIMIT_ENABLE=False)
-    @patch.dict(os.environ, {"MAILGUN_TOKEN": "t", "MAILGUN_DOMAIN": "d.com", "MAILGUN_RECEIVER": "r@r.com"})
-    @patch("reportFake.views.requests.post")
-    def test_send_report_mailgun_non_200_returns_failure(self, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 500
-        mock_post.return_value = mock_resp
+    @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
+    @patch("contact.asana.requests.post")
+    def test_send_report_asana_error_returns_failure(self, mock_post: MagicMock):
+        mock_post.return_value = MagicMock(status_code=500, text="")
         response = self.c.post(
             "/reportFake",
             {"description": "d", "url": "https://example.com/unique1", "more_info": "m"},

@@ -16,5 +16,8 @@ class ContactRequest(models.Model):
     # Title of the request; for report_fake this holds the reported URL.
     title = models.CharField(max_length=500)
     message = models.TextField()
-    token = models.CharField(max_length=100, default=None, null=True, blank=True)
+    # Client metadata for triage (e.g. "Volksverpetzer", "2.3.0", "ios").
+    app_variant = models.CharField(max_length=100, default="", blank=True)
+    app_version = models.CharField(max_length=50, default="", blank=True)
+    platform = models.CharField(max_length=50, default="", blank=True)
     date = models.DateTimeField(auto_now_add=True, null=True)

@@ -31,7 +31,7 @@ def contact(request: HttpRequest):
         request (Post Request):
             JSON body requires category (report_fake | app_feedback | other),
             title (the reported URL for report_fake) and message.
-            Optional: token (push notification token).
+            Optional: app_variant, app_version, platform (client metadata).
 
     Returns:
         JSONResponse: success, id of the contact request
@@ -75,11 +75,17 @@ def contact(request: HttpRequest):
         return JsonResponse({"success": False, "error": "Missing message"}, status=400)
     message = message.strip()
 
+    def meta(key: str, max_length: int) -> str:
+        value = data.get(key)
+        return value.strip()[:max_length] if isinstance(value, str) else ""
+
     filterset = {
         "category": category,
         "title": title[:500],
         "message": message,
-        "token": data.get("token", None),
+        "app_variant": meta("app_variant", 100),
+        "app_version": meta("app_version", 50),
+        "platform": meta("platform", 50),
     }
 
     # Check if this exact request already exists (e.g. double tap on submit)
@@ -87,9 +93,24 @@ def contact(request: HttpRequest):
     if not contact_request:
         contact_request = ContactRequest.objects.create(**filterset)
         label = CATEGORY_LABELS[ContactRequest.Category(category)]
+        client = " | ".join(
+            part
+            for part in (
+                contact_request.app_variant,
+                contact_request.app_version,
+                contact_request.platform,
+            )
+            if part
+        )
         created = create_asana_task(
             name=f"{label} | {title}",
-            notes=f"{message}\n\nKategorie: {label}\nID: {contact_request.id}",
+            notes=(
+                f"{message}\n\n"
+                f"Kategorie: {label}\n"
+                f"App: {client or 'unbekannt'}\n"
+                f"ID: {contact_request.id}"
+            ),
+            category=category,
         )
         if not created:
             return JsonResponse({"success": False}, status=502)

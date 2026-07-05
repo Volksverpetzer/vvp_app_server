@@ -45,6 +45,45 @@ class ContactTests(TestCase):
 
     @patch.dict(os.environ, ASANA_ENV)
     @patch("contact.asana.requests.post", return_value=asana_response())
+    def test_app_metadata_is_stored_and_in_notes(self, mock_post: MagicMock):
+        response = self.post(
+            {
+                "category": "app_feedback",
+                "title": "Dark mode",
+                "message": "Der Dark Mode ist zu hell.",
+                "app_variant": "Volksverpetzer",
+                "app_version": "2.3.0",
+                "platform": "ios",
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        request = ContactRequest.objects.get(title="Dark mode")
+        self.assertEqual(request.app_variant, "Volksverpetzer")
+        self.assertEqual(request.app_version, "2.3.0")
+        self.assertEqual(request.platform, "ios")
+        notes = mock_post.call_args.kwargs["json"]["data"]["notes"]
+        self.assertIn("App: Volksverpetzer | 2.3.0 | ios", notes)
+
+    @patch.dict(
+        os.environ, ASANA_ENV | {"ASANA_SECTION_APP_FEEDBACK": "777"}
+    )
+    @patch("contact.asana.requests.post", return_value=asana_response())
+    def test_category_section_is_used_when_configured(self, mock_post: MagicMock):
+        response = self.post(
+            {
+                "category": "app_feedback",
+                "title": "Dark mode",
+                "message": "Der Dark Mode ist zu hell.",
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = mock_post.call_args.kwargs["json"]["data"]
+        self.assertEqual(
+            payload["memberships"], [{"project": "12345", "section": "777"}]
+        )
+
+    @patch.dict(os.environ, ASANA_ENV)
+    @patch("contact.asana.requests.post", return_value=asana_response())
     def test_send_fake_report(self, mock_post: MagicMock):
         response = self.post(
             {
