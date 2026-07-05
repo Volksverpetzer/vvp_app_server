@@ -1,4 +1,10 @@
-"""Views for the reportFake app."""
+"""Views for the reportFake app.
+
+LEGACY / UNUSED: current app versions submit fake reports through the
+generic ``contact`` app instead. This pipeline (report -> triage ->
+Bluesky publish -> status polling) is kept for backward compatibility
+with older app versions and in case we want to revive it later.
+"""
 
 import json
 import logging
