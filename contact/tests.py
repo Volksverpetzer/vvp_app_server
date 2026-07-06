@@ -221,6 +221,17 @@ class ContactTests(TestCase):
         mock_post.assert_called_once()
         self.assertTrue(ContactRequest.objects.get().posted_to_asana)
 
+    def test_dedupe_hash_is_not_ambiguous(self):
+        # With a naive delimiter-joined serialization these two payloads
+        # would collapse to the same canonical string.
+        first = ContactRequest.build_dedupe_hash(
+            message="m\x1fplatform=p", platform=""
+        )
+        second = ContactRequest.build_dedupe_hash(
+            message="m", platform="p\x1fplatform="
+        )
+        self.assertNotEqual(first, second)
+
     def test_dedupe_is_enforced_at_the_database_level(self):
         # Concurrent identical POSTs may both pass an application-level
         # existence check; the unique hash column collapses them.

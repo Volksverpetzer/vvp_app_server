@@ -1,4 +1,5 @@
 import hashlib
+import json
 import uuid
 
 from django.db import models
@@ -31,8 +32,10 @@ class ContactRequest(models.Model):
 
     @staticmethod
     def build_dedupe_hash(**fields: str) -> str:
-        """Hash the normalized payload fields for the uniqueness check."""
-        joined = "\x1f".join(
-            f"{key}={fields[key]}" for key in sorted(fields)
-        )
+        """Hash the normalized payload fields for the uniqueness check.
+
+        JSON serialization is unambiguous, so no crafted field value can
+        make two different payloads collapse to the same hash.
+        """
+        joined = json.dumps(fields, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(joined.encode()).hexdigest()
