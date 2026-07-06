@@ -71,9 +71,11 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `TIKTOK_CLIENT_SECRET` | TikTok API client secret |
 | `TIKTOK_REFRESH_TOKEN` | TikTok OAuth refresh token (fallback when no DB token exists) |
 | `YT_ACCESS_TOKEN` | YouTube Data API v3 key |
-| `MAILGUN_DOMAIN` | Mailgun domain for sending report emails |
-| `MAILGUN_TOKEN` | Mailgun API token |
-| `MAILGUN_RECEIVER` | Email address to receive fake-report notifications |
+| `ASANA_TOKEN` | Asana personal access token (contact requests & fake reports) |
+| `ASANA_PROJECT_GID` | Asana project (board) gid that contact tasks are added to |
+| `ASANA_SECTION_REPORT_FAKE` | Board section gid for fake reports (optional) |
+| `ASANA_SECTION_APP_FEEDBACK` | Board section gid for app feedback (optional) |
+| `ASANA_SECTION_OTHER` | Board section gid for other requests (optional) |
 | `PLAUSIBLE_TOKEN` | Plausible Analytics API token |
 
 ## Local Development
