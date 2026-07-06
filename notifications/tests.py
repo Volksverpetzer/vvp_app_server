@@ -278,6 +278,19 @@ class TestNotification(TestCase):
         )
         self.assertFalse(device.notification_new_pruefpunkt)
 
+    def test_register_malformed_settings_returns_400(self):
+        # Missing new_fact_check and a non-dict new_post: a client-side payload
+        # error, so it must be a 400 rather than a masked 500.
+        response = self.c.post(
+            "/register",
+            {
+                "expo_token": "ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]",
+                "settings": {"new_post": True},
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+
     def test_pruefpunkt_post_targets_pruefpunkt_devices(self):
         pp_device = NotificationDevice.objects.create(
             expo_token="ExponentPushToken[ppDeviceTokenAAAAAAAA]",
