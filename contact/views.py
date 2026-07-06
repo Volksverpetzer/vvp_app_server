@@ -113,5 +113,8 @@ def contact(request: HttpRequest):
             category=category,
         )
         if not created:
+            # Roll back so a retry doesn't hit the dedupe path and report
+            # success for a request that never reached Asana.
+            contact_request.delete()
             return JsonResponse({"success": False}, status=502)
     return JsonResponse({"success": True, "id": contact_request.id})

@@ -92,6 +92,9 @@ def reportFake(request: HttpRequest):
             category="report_fake",
         )
         if not created:
+            # Roll back so a retry doesn't hit the dedupe path and report
+            # success for a report that never reached Asana.
+            report.delete()
             return JsonResponse({"success": False})
     return JsonResponse({"success": True, "id": report.id})
 

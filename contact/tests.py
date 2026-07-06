@@ -145,6 +145,20 @@ class ContactTests(TestCase):
             {"category": "other", "title": "t", "message": "eine Nachricht"}
         )
         self.assertEqual(response.status_code, 502)
+        # The row is rolled back so a retry can reattempt the Asana post
+        self.assertFalse(ContactRequest.objects.exists())
+
+    @patch.dict(os.environ, ASANA_ENV)
+    @patch("contact.asana.requests.post")
+    def test_retry_after_asana_failure_posts_again(self, mock_post: MagicMock):
+        body = {"category": "other", "title": "t", "message": "eine Nachricht"}
+        mock_post.return_value = asana_response(500)
+        self.assertEqual(self.post(body).status_code, 502)
+        mock_post.return_value = asana_response()
+        response = self.post(body)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(json.loads(response.content)["success"])
+        self.assertEqual(mock_post.call_count, 2)
 
     @patch.dict(os.environ, ASANA_ENV)
     @patch("contact.asana.requests.post", return_value=asana_response())

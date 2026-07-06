@@ -103,9 +103,29 @@ class Notification(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(json.loads(response.content)["success"])
+        # The row is rolled back so a retry can reattempt the Asana post
+        self.assertFalse(
+            FakeReport.objects.filter(url="https://example.com/unique1").exists()
+        )
 
     @override_settings(RATELIMIT_ENABLE=False)
-    def test_send_report_uppercase_scheme_accepted(self):
+    @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
+    @patch("contact.asana.requests.post")
+    def test_send_report_retry_after_asana_failure(self, mock_post: MagicMock):
+        body = {"description": "d", "url": "https://example.com/retry", "more_info": "m"}
+        mock_post.return_value = MagicMock(status_code=500, text="")
+        response = self.c.post("/reportFake", body, content_type="application/json")
+        self.assertFalse(json.loads(response.content)["success"])
+        mock_post.return_value = MagicMock(status_code=201, text="")
+        response = self.c.post("/reportFake", body, content_type="application/json")
+        self.assertTrue(json.loads(response.content)["success"])
+        self.assertEqual(mock_post.call_count, 2)
+
+    @override_settings(RATELIMIT_ENABLE=False)
+    @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
+    @patch("contact.asana.requests.post")
+    def test_send_report_uppercase_scheme_accepted(self, mock_post: MagicMock):
+        mock_post.return_value = MagicMock(status_code=201, text="")
         response = self.c.post(
             "/reportFake",
             {"description": "d", "url": "HTTPS://welt.de", "more_info": "m"},
