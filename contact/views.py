@@ -45,15 +45,11 @@ def contact(request: HttpRequest):
     except json.JSONDecodeError:
         return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
     if not isinstance(data, dict):
-        return JsonResponse(
-            {"success": False, "error": "Invalid JSON"}, status=400
-        )
+        return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
 
     category = data.get("category")
     if category not in ContactRequest.Category.values:
-        return JsonResponse(
-            {"success": False, "error": "Invalid category"}, status=400
-        )
+        return JsonResponse({"success": False, "error": "Invalid category"}, status=400)
 
     title = data.get("title")
     if not isinstance(title, str) or not title.strip():

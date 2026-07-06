@@ -43,7 +43,7 @@ def fully_unquote(url: str) -> str:
 def replace_media_urls(data: Any, request: HttpRequest) -> Any:
     """
     Recursively traverse the data structure and replace each 'media_url'
-    and 'thumbnail_url' with a custom endpoint URL that includes the hash 
+    and 'thumbnail_url' with a custom endpoint URL that includes the hash
     and the original URL.
     """
     if isinstance(data, dict):

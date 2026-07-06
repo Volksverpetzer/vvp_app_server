@@ -19,7 +19,9 @@ def googleFact(request: HttpRequest) -> JsonResponse:
         keywords = request.GET.get("keywords", "")
         url = "https://factchecktools.googleapis.com/v1alpha1/claims:search"
         response = requests.get(
-            url, params={"query": keywords, "key": token, "languageCode": "de"}
+            url,
+            params={"query": keywords, "key": token, "languageCode": "de"},
+            timeout=10,
         )
         data = response.json()
         cache_set(keywords, data, 60 * 60 * 24)

@@ -46,10 +46,15 @@ def notification_stats(request: HttpRequest):
         return JsonResponse({"error": "missing slug"}, status=400)
 
     title_field = post.get("title")
-    title_rendered = title_field.get("rendered") if isinstance(title_field, dict) else None
+    title_rendered = (
+        title_field.get("rendered") if isinstance(title_field, dict) else None
+    )
     post_title = post.get("post_title")
-    raw_body = (post_title if isinstance(post_title, str) else None) or \
-               (title_rendered if isinstance(title_rendered, str) else None) or ""
+    raw_body = (
+        (post_title if isinstance(post_title, str) else None)
+        or (title_rendered if isinstance(title_rendered, str) else None)
+        or ""
+    )
     body = html.unescape(raw_body)
     if not body:
         return JsonResponse({"error": "missing post title"}, status=400)

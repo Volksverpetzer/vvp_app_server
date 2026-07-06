@@ -3,7 +3,10 @@ from django.http import HttpRequest, HttpResponse
 
 
 class EdgeCacheControlMiddleware(MiddlewareMixin):
-    """Sets Cache-Control headers: no cache for authenticated views, caching for public GETs."""
+    """Set Cache-Control headers.
+
+    No caching for authenticated views; caching for public GETs.
+    """
 
     def process_response(
         self, request: HttpRequest, response: HttpResponse

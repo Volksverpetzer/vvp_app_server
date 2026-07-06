@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('reportFake', '0006_alter_fakereport_date'),
+        ("reportFake", "0006_alter_fakereport_date"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='fakereport',
-            name='posted_to_asana',
+            model_name="fakereport",
+            name="posted_to_asana",
             field=models.BooleanField(default=False),
         ),
     ]

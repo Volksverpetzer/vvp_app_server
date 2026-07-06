@@ -119,30 +119,40 @@ class TestNotification(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_send_notification(self):
-        mock_post = {"link": "https://www.volksverpetzer.de/test/", "title": {"rendered": "Test"}, "yoast_head_json": {}}
+        mock_post = {
+            "link": "https://www.volksverpetzer.de/test/",
+            "title": {"rendered": "Test"},
+            "yoast_head_json": {},
+        }
         found_response = MagicMock()
         found_response.json.return_value = [mock_post]
         not_found_response = MagicMock()
         not_found_response.json.return_value = []
 
-        with patch("notifications.services.webhook_new_post.requests.get", side_effect=[found_response, not_found_response]):
+        with patch(
+            "notifications.services.webhook_new_post.requests.get",
+            side_effect=[found_response, not_found_response],
+        ):
             start_time = time.time()
             response = self.c.post(
                 "/webhook_new_post",
                 data=example_post,
                 content_type="application/json",
-                HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
             )
             self.assertEqual(response.status_code, 200)
             end_time = time.time()
             elapsed_time = end_time - start_time
             self.assertLess(elapsed_time, 3.0)
-            missing_post = {**example_post, "post": {**example_post["post"], "post_name": "das-ist-ein-test-hier"}}
+            missing_post = {
+                **example_post,
+                "post": {**example_post["post"], "post_name": "das-ist-ein-test-hier"},
+            }
             response = self.c.post(
                 "/webhook_new_post",
                 data=missing_post,
                 content_type="application/json",
-                HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
             )
             self.assertEqual(response.status_code, 503)
 
@@ -173,20 +183,29 @@ class TestNotification(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_bearer_scheme_is_case_insensitive(self):
-        mock_post = {"link": "https://www.volksverpetzer.de/test/", "title": {"rendered": "Test"}, "yoast_head_json": {}}
+        mock_post = {
+            "link": "https://www.volksverpetzer.de/test/",
+            "title": {"rendered": "Test"},
+            "yoast_head_json": {},
+        }
         found_response = MagicMock()
         found_response.json.return_value = [mock_post]
-        with patch("notifications.services.webhook_new_post.requests.get", return_value=found_response):
+        with patch(
+            "notifications.services.webhook_new_post.requests.get",
+            return_value=found_response,
+        ):
             response = self.c.post(
                 "/webhook_new_post",
                 data=example_post,
                 content_type="application/json",
-                HTTP_AUTHORIZATION=f'bearer {os.environ["NOTIFICATION_BEARER"]}',
+                HTTP_AUTHORIZATION=f"bearer {os.environ['NOTIFICATION_BEARER']}",
             )
         self.assertEqual(response.status_code, 200)
 
     def test_missing_notification_bearer_env_returns_403(self):
-        env_without_bearer = {k: v for k, v in os.environ.items() if k != "NOTIFICATION_BEARER"}
+        env_without_bearer = {
+            k: v for k, v in os.environ.items() if k != "NOTIFICATION_BEARER"
+        }
         with patch.dict(os.environ, env_without_bearer, clear=True):
             response = self.c.post(
                 "/webhook_new_post",
@@ -201,7 +220,7 @@ class TestNotification(TestCase):
             "/webhook_new_post",
             data="not-json",
             content_type="application/json",
-            HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+            HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("invalid JSON", response.json()["error"])
@@ -211,19 +230,24 @@ class TestNotification(TestCase):
             "/webhook_new_post",
             data=json.dumps([1, 2, 3]),
             content_type="application/json",
-            HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+            HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
         )
         self.assertEqual(response.status_code, 400)
 
     def test_wp_api_non2xx_returns_503_upstream_error(self):
         error_response = MagicMock()
-        error_response.raise_for_status.side_effect = requests.exceptions.HTTPError("503 Server Error")
-        with patch("notifications.services.webhook_new_post.requests.get", return_value=error_response):
+        error_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            "503 Server Error"
+        )
+        with patch(
+            "notifications.services.webhook_new_post.requests.get",
+            return_value=error_response,
+        ):
             response = self.c.post(
                 "/webhook_new_post",
                 data=example_post,
                 content_type="application/json",
-                HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
             )
         self.assertEqual(response.status_code, 503)
         self.assertIn(b"Upstream error", response.content)
@@ -235,7 +259,7 @@ class TestNotification(TestCase):
             "/webhook_new_post",
             data=json.dumps(payload),
             content_type="application/json",
-            HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+            HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("missing post.post_name", response.json()["error"])
@@ -309,17 +333,18 @@ class TestNotification(TestCase):
         }
         found_response = MagicMock()
         found_response.json.return_value = [mock_post]
-        with patch(
-            "notifications.services.webhook_new_post.requests.get",
-            return_value=found_response,
-        ), patch(
-            "notifications.services.webhook_new_post.async_task"
-        ) as mock_async:
+        with (
+            patch(
+                "notifications.services.webhook_new_post.requests.get",
+                return_value=found_response,
+            ),
+            patch("notifications.services.webhook_new_post.async_task") as mock_async,
+        ):
             response = self.c.post(
                 "/webhook_new_post",
                 data=pp_post,
                 content_type="application/json",
-                HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
             )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(mock_async.called)
@@ -345,17 +370,18 @@ class TestNotification(TestCase):
         }
         found_response = MagicMock()
         found_response.json.return_value = [mock_post]
-        with patch(
-            "notifications.services.webhook_new_post.requests.get",
-            return_value=found_response,
-        ), patch(
-            "notifications.services.webhook_new_post.async_task"
-        ) as mock_async:
+        with (
+            patch(
+                "notifications.services.webhook_new_post.requests.get",
+                return_value=found_response,
+            ),
+            patch("notifications.services.webhook_new_post.async_task") as mock_async,
+        ):
             response = self.c.post(
                 "/webhook_new_post",
                 data=example_post,
                 content_type="application/json",
-                HTTP_AUTHORIZATION=f'Bearer {os.environ["NOTIFICATION_BEARER"]}',
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
             )
         self.assertEqual(response.status_code, 200)
         self.assertTrue(mock_async.called)
@@ -382,7 +408,9 @@ class NotificationStatsTest(TestCase):
         )
 
     def test_missing_auth_returns_403(self):
-        response = self.client.post("/notification_stats", content_type="application/json")
+        response = self.client.post(
+            "/notification_stats", content_type="application/json"
+        )
         self.assertEqual(response.status_code, 403)
 
     def test_wrong_token_returns_403(self):
@@ -408,7 +436,9 @@ class NotificationStatsTest(TestCase):
         self.assertEqual(response.json(), {"slug": "my-post", "success": False})
 
     def test_delivered_returns_true(self):
-        device = NotificationDevice.objects.create(expo_token="ExponentPushToken[stats-test]")
+        device = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[stats-test]"
+        )
         PushMessageLog.objects.create(
             id="stats-log-1", to=device, body="My Post", title="My Post", data={}
         )
@@ -445,7 +475,9 @@ class NotificationStatsTest(TestCase):
         self.assertIn("missing slug", response.json()["error"])
 
     def test_delivered_by_url_returns_true(self):
-        device = NotificationDevice.objects.create(expo_token="ExponentPushToken[stats-url-test]")
+        device = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[stats-url-test]"
+        )
         PushMessageLog.objects.create(
             id="stats-url-log-1",
             to=device,
@@ -465,7 +497,9 @@ class NotificationStatsTest(TestCase):
         self.assertEqual(response.json(), {"slug": "my-post", "success": True})
 
     def test_url_query_falls_back_to_body_for_legacy_rows(self):
-        device = NotificationDevice.objects.create(expo_token="ExponentPushToken[stats-legacy-test]")
+        device = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[stats-legacy-test]"
+        )
         PushMessageLog.objects.create(
             id="stats-legacy-log-1",
             to=device,
@@ -510,10 +544,15 @@ class RegisterErrorsTest(TestCase):
     def test_invalid_expo_token_returns_403(self):
         response = self.client.post(
             "/register",
-            data=json.dumps({
-                "expo_token": "not-a-valid-token",
-                "settings": {"new_post": {"value": True}, "new_fact_check": {"value": False}},
-            }),
+            data=json.dumps(
+                {
+                    "expo_token": "not-a-valid-token",
+                    "settings": {
+                        "new_post": {"value": True},
+                        "new_fact_check": {"value": False},
+                    },
+                }
+            ),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 403)
@@ -524,10 +563,15 @@ class RegisterErrorsTest(TestCase):
         mock_goc.side_effect = Exception("db error")
         response = self.client.post(
             "/register",
-            data=json.dumps({
-                "expo_token": "ExponentPushToken[test-token-1234]",
-                "settings": {"new_post": {"value": True}, "new_fact_check": {"value": False}},
-            }),
+            data=json.dumps(
+                {
+                    "expo_token": "ExponentPushToken[test-token-1234]",
+                    "settings": {
+                        "new_post": {"value": True},
+                        "new_fact_check": {"value": False},
+                    },
+                }
+            ),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 500)
@@ -546,6 +590,7 @@ class SendPushMessageTest(TestCase):
         )
         send_mock = mock_build.return_value
         from notifications.helper import send_push_message
+
         send_push_message([self.device], "title", "body")
         send_mock.publish_multiple.assert_not_called()
 
@@ -558,6 +603,7 @@ class SendPushMessageTest(TestCase):
         mock_build.return_value.publish_multiple.return_value = [ticket]
 
         from notifications.helper import send_push_message
+
         send_push_message([self.device], "title", "body")
 
         mock_log_create.assert_called_once()
@@ -574,14 +620,15 @@ class SendPushMessageTest(TestCase):
         mock_build.return_value.publish_multiple.return_value = [ticket]
 
         send_push_message([self.device], "title", "new-body")
-        self.assertFalse(
-            NotificationDevice.objects.filter(pk=self.device.pk).exists()
-        )
+        self.assertFalse(NotificationDevice.objects.filter(pk=self.device.pk).exists())
 
     @patch("notifications.helper.time.sleep")
     @patch("notifications.helper.send_push_message")
-    def test_send_push_message_delayed_calls_send_then_sleeps(self, mock_send, mock_sleep):
+    def test_send_push_message_delayed_calls_send_then_sleeps(
+        self, mock_send, mock_sleep
+    ):
         from notifications.helper import send_push_message_delayed
+
         send_push_message_delayed([self.device], "t", "b", extra={"url": "x"})
         mock_send.assert_called_once_with([self.device], "t", "b", {"url": "x"})
         mock_sleep.assert_called_once_with(15)
@@ -589,24 +636,29 @@ class SendPushMessageTest(TestCase):
     @patch.dict(os.environ, {"EXPO_TOKEN": "test-expo-token"})  # nosec
     def test_build_push_client_with_token(self):
         from notifications.helper import _build_push_client
+
         client = _build_push_client()
         self.assertIsNotNone(client)
 
     @patch("notifications.helper._build_push_client")
     def test_push_server_error_is_reraised(self, mock_build):
         from exponent_server_sdk import PushServerError
+
         mock_build.return_value.publish_multiple.side_effect = PushServerError(
             MagicMock(), MagicMock(), errors=[], response_data={}
         )
         from notifications.helper import send_push_message
+
         with self.assertRaises(PushServerError):
             send_push_message([self.device], "title", "body2")
 
     @patch("notifications.helper._build_push_client")
     def test_connection_error_is_reraised(self, mock_build):
         from requests.exceptions import ConnectionError as ReqConnectionError
+
         mock_build.return_value.publish_multiple.side_effect = ReqConnectionError()
         from notifications.helper import send_push_message
+
         with self.assertRaises(ReqConnectionError):
             send_push_message([self.device], "title", "body3")
 
@@ -623,6 +675,7 @@ class CheckReceiptsTest(TestCase):
         err = MagicMock(status="error")
         mock_build.return_value.check_receipts.return_value = [ok, err]
         from notifications.helper import check_receipts
+
         errors = check_receipts([])
         self.assertEqual(len(errors), 1)
         self.assertEqual(errors[0].status, "error")
@@ -631,16 +684,19 @@ class CheckReceiptsTest(TestCase):
     def test_check_receipts_empty_returns_empty_list(self, mock_build):
         mock_build.return_value.check_receipts.return_value = []
         from notifications.helper import check_receipts
+
         errors = check_receipts([])
         self.assertEqual(errors, [])
 
     @patch("notifications.helper._build_push_client")
     def test_check_receipts_push_server_error_reraised(self, mock_build):
         from exponent_server_sdk import PushServerError
+
         mock_build.return_value.check_receipts.side_effect = PushServerError(
             MagicMock(), MagicMock(), errors=[], response_data={}
         )
         from notifications.helper import check_receipts
+
         with self.assertRaises(PushServerError):
             check_receipts([])
 

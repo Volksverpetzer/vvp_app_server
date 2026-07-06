@@ -38,7 +38,10 @@ def instaFeed(request: HttpRequest) -> JsonResponse | HttpResponse:
     url = "https://graph.instagram.com/v15.0/me/media"
     params = {
         "limit": 20,
-        "fields": "id,permalink,media_type,caption,timestamp,children{media_url},media_url,thumbnail_url",
+        "fields": (
+            "id,permalink,media_type,caption,timestamp,"
+            "children{media_url},media_url,thumbnail_url"
+        ),
         "access_token": getToken(account),
     }
     try:
@@ -74,7 +77,10 @@ def instaById(request: HttpRequest, id: str) -> JsonResponse | HttpResponse:
         return err
     url = f"https://graph.instagram.com/v15.0/{id}"
     params = {
-        "fields": "permalink,media_type,caption,timestamp,children{media_url},media_url,thumbnail_url",
+        "fields": (
+            "permalink,media_type,caption,timestamp,"
+            "children{media_url},media_url,thumbnail_url"
+        ),
         "access_token": getToken(account),
     }
     try:
@@ -110,6 +116,7 @@ def refreshInstaToken(
     resp = requests.get(
         "https://graph.instagram.com/refresh_access_token",
         params={"grant_type": "ig_refresh_token", "access_token": access},
+        timeout=10,
     )
     data = resp.json()
     return data.get("access_token"), data.get("expires_in")

@@ -4,15 +4,14 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('reportFake', '0005_fakereport_token'),
+        ("reportFake", "0005_fakereport_token"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='fakereport',
-            name='date',
+            model_name="fakereport",
+            name="date",
             field=models.DateTimeField(auto_now_add=True, null=True),
         ),
     ]

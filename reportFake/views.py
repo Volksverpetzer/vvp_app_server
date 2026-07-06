@@ -62,10 +62,15 @@ def reportFake(request: HttpRequest):
     # Check if rate limit was exceeded
 
     data = json.loads(request.body)
-    
+
     url = data.get("url")
     if not isinstance(url, str) or not url.lower().startswith(("http://", "https://")):
-        return JsonResponse({"success": False, "error": "Invalid URL format. URL must start with http:// or https://"})
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Invalid URL format. URL must start with http:// or https://",
+            }
+        )
 
     filterset = {
         "description": data.get("description", None),
@@ -138,10 +143,12 @@ def assign_bluesky(request: HttpRequest):
         if not report_id or not bluesky_url:
             messages.error(request, "Missing required fields")
             return redirect("triageFake")
-            
+
         # Validate URL to prevent XSS
         if not bluesky_url.lower().startswith(("http://", "https://")):
-            messages.error(request, "Invalid URL format. URL must start with http:// or https://")
+            messages.error(
+                request, "Invalid URL format. URL must start with http:// or https://"
+            )
             return redirect("triageFake")
 
         try:
@@ -194,5 +201,3 @@ def statusFake(request: HttpRequest, report_id: uuid.UUID):
         else None
     )
     return JsonResponse({"id": report.id, "status": status, "url": url})
-
-

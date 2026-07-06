@@ -99,7 +99,9 @@ class PaymentTestCase(TestCase):
 class CreateSubscriptionTest(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
-        self.env_patcher = mock.patch.dict(os.environ, {"STRIPE_SECRET_KEY": "mock_key"})  # nosec
+        self.env_patcher = mock.patch.dict(
+            os.environ, {"STRIPE_SECRET_KEY": "mock_key"}
+        )  # nosec
         self.env_patcher.start()
 
     def tearDown(self):
@@ -107,6 +109,7 @@ class CreateSubscriptionTest(TestCase):
 
     def _call(self, data):
         from payment.views import createSubscription
+
         request = self.factory.post("/createSubscription", data)
         return createSubscription(request)
 
@@ -121,6 +124,7 @@ class CreateSubscriptionTest(TestCase):
         response = self._call({"customer": "cus_123", "amount": "10"})
         self.assertEqual(response.status_code, 200)
         import json
+
         data = json.loads(response.content)
         self.assertIn("subscription", data)
         mock_sub.assert_called_once()
@@ -130,4 +134,6 @@ class CreateSubscriptionTest(TestCase):
         mock_sub.return_value = {"id": "sub_456"}
         self._call({"customer": "cus_456", "amount": "999"})
         call_kwargs = mock_sub.call_args[1]
-        self.assertEqual(call_kwargs["items"][0]["price"], "price_1NZZDUFricedKvSmfqgZOYKj")
+        self.assertEqual(
+            call_kwargs["items"][0]["price"], "price_1NZZDUFricedKvSmfqgZOYKj"
+        )
