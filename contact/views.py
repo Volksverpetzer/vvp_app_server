@@ -89,11 +89,11 @@ def contact(request: HttpRequest):
     # Dedupe double-submits atomically: the unique hash column collapses
     # concurrent identical POSTs into a single row (get_or_create retries
     # the lookup on IntegrityError).
-    contact_request, created_row = ContactRequest.objects.get_or_create(
+    contact_request, _ = ContactRequest.objects.get_or_create(
         dedupe_hash=ContactRequest.build_dedupe_hash(**fields),
         defaults=fields,
     )
-    if created_row:
+    if not contact_request.posted_to_asana:
         label = CATEGORY_LABELS[ContactRequest.Category(category)]
         client = " | ".join(
             part
@@ -115,8 +115,9 @@ def contact(request: HttpRequest):
             category=category,
         )
         if not created:
-            # Roll back so a retry doesn't hit the dedupe path and report
-            # success for a request that never reached Asana.
-            contact_request.delete()
+            # Keep the row unposted so retries and concurrent duplicates
+            # re-attempt the Asana post instead of deduping into success.
             return JsonResponse({"success": False}, status=502)
+        contact_request.posted_to_asana = True
+        contact_request.save(update_fields=["posted_to_asana"])
     return JsonResponse({"success": True, "id": contact_request.id})

@@ -162,8 +162,8 @@ class ContactTests(TestCase):
             {"category": "other", "title": "t", "message": "eine Nachricht"}
         )
         self.assertEqual(response.status_code, 502)
-        # The row is rolled back so a retry can reattempt the Asana post
-        self.assertFalse(ContactRequest.objects.exists())
+        # The row is kept unposted so a retry reattempts the Asana post
+        self.assertFalse(ContactRequest.objects.get().posted_to_asana)
 
     @patch.dict(os.environ, ASANA_ENV)
     @patch("contact.asana.requests.post")
@@ -186,6 +186,33 @@ class ContactTests(TestCase):
         self.assertEqual(first["id"], second["id"])
         self.assertEqual(ContactRequest.objects.count(), 1)
         mock_post.assert_called_once()
+
+    @patch.dict(os.environ, ASANA_ENV)
+    @patch("contact.asana.requests.post", return_value=asana_response())
+    def test_dedupe_hit_on_unposted_row_reattempts_post(
+        self, mock_post: MagicMock
+    ):
+        # Simulates the concurrent-duplicate race: the row exists but the
+        # Asana task was never created. The duplicate must not report
+        # success without posting.
+        fields = {
+            "category": "other",
+            "title": "t",
+            "message": "eine Nachricht",
+            "app_variant": "",
+            "app_version": "",
+            "platform": "",
+        }
+        ContactRequest.objects.create(
+            dedupe_hash=ContactRequest.build_dedupe_hash(**fields), **fields
+        )
+        response = self.post(
+            {"category": "other", "title": "t", "message": "eine Nachricht"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(json.loads(response.content)["success"])
+        mock_post.assert_called_once()
+        self.assertTrue(ContactRequest.objects.get().posted_to_asana)
 
     def test_dedupe_is_enforced_at_the_database_level(self):
         # Concurrent identical POSTs may both pass an application-level

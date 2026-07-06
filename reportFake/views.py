@@ -79,6 +79,7 @@ def reportFake(request: HttpRequest):
     report = FakeReport.objects.filter(**filterset).first()
     if not report:
         report = FakeReport.objects.create(**filterset)
+    if not report.posted_to_asana:
         # Old app versions post here; put their reports on the same Asana
         # board as the contact app so fake reports converge in one inbox.
         created = create_asana_task(
@@ -92,10 +93,11 @@ def reportFake(request: HttpRequest):
             category="report_fake",
         )
         if not created:
-            # Roll back so a retry doesn't hit the dedupe path and report
-            # success for a report that never reached Asana.
-            report.delete()
+            # Keep the row unposted so retries and concurrent duplicates
+            # re-attempt the Asana post instead of deduping into success.
             return JsonResponse({"success": False})
+        report.posted_to_asana = True
+        report.save(update_fields=["posted_to_asana"])
     return JsonResponse({"success": True, "id": report.id})
 
 

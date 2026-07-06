@@ -13,5 +13,8 @@ class FakeReport(models.Model):
     token = models.CharField(max_length=100, default=None, null=True)
     allowed_public = models.BooleanField(default=False, null=True)
     post_id = models.CharField(max_length=100, default=None, null=True)
+    # False until the report reached the Asana board (pre-Asana rows were
+    # delivered by email); deduped resubmits re-attempt the post.
+    posted_to_asana = models.BooleanField(default=False)
     date = models.DateTimeField(auto_now_add=True, null=True)
     # img = models.ImageField(upload_to='images/', default=None)

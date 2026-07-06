@@ -24,6 +24,9 @@ class ContactRequest(models.Model):
     # Hash over the normalized payload; the unique constraint makes the
     # double-submit dedupe atomic (a TextField can't go into an index).
     dedupe_hash = models.CharField(max_length=64, unique=True)
+    # False until the Asana task exists; deduped requests re-attempt the
+    # post instead of reporting success for a task that was never created.
+    posted_to_asana = models.BooleanField(default=False)
     date = models.DateTimeField(auto_now_add=True, null=True)
 
     @staticmethod

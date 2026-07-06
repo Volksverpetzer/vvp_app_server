@@ -103,10 +103,9 @@ class Notification(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(json.loads(response.content)["success"])
-        # The row is rolled back so a retry can reattempt the Asana post
-        self.assertFalse(
-            FakeReport.objects.filter(url="https://example.com/unique1").exists()
-        )
+        # The row is kept unposted so a retry reattempts the Asana post
+        report = FakeReport.objects.get(url="https://example.com/unique1")
+        self.assertFalse(report.posted_to_asana)
 
     @override_settings(RATELIMIT_ENABLE=False)
     @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
