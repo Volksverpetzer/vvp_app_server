@@ -1,7 +1,7 @@
 import os
-from datetime import datetime
 
 from django.http import HttpRequest, JsonResponse
+from django.utils import timezone
 from googleapiclient.discovery import build  # type: ignore[reportMissingTypeStubs]
 
 from vvp_app_server.cache_utils import cache_response
@@ -25,7 +25,7 @@ def ytAPI(request: HttpRequest):
     )
     yt_response = yt_request.execute()
     if yt_response["items"] == []:
-        return JsonResponse({"items": [], "time": datetime.now().isoformat()})
+        return JsonResponse({"items": [], "time": timezone.now().isoformat()})
     yt_request = youtube.videos().list(
         part="snippet,player",
         id=",".join(
@@ -53,6 +53,6 @@ def ytAPI(request: HttpRequest):
             filtered_videos.append(video)
 
     # Create a new response with filtered videos
-    filtered_response = {"items": filtered_videos, "time": datetime.now().isoformat()}
+    filtered_response = {"items": filtered_videos, "time": timezone.now().isoformat()}
 
     return JsonResponse(filtered_response)

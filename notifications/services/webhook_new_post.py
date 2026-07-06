@@ -61,7 +61,7 @@ def webhook_new_post(request: HttpRequest):
     Returns:
         JsonResponse (200): notification batches scheduled successfully
         HttpResponse (403): missing or invalid Bearer token
-        JsonResponse (400): invalid JSON body or missing required fields (post.post_name)
+        JsonResponse (400): invalid JSON body or missing fields (post.post_name)
         HttpResponse (405): non-POST request (enforced by @require_http_methods)
         HttpResponse (503): upstream WordPress API error or post not found
     """
@@ -114,10 +114,16 @@ def webhook_new_post(request: HttpRequest):
     yoast = post.get("yoast_head_json")
     yoast = yoast if isinstance(yoast, dict) else {}
     og = yoast.get("og_image") or []
-    image_url = og[0].get("url") if isinstance(og, list) and og and isinstance(og[0], dict) else None
+    image_url = (
+        og[0].get("url")
+        if isinstance(og, list) and og and isinstance(og[0], dict)
+        else None
+    )
     image_url = image_url if isinstance(image_url, str) else None
     title_field = post.get("title")
-    title = html.unescape(title_field.get("rendered", "") if isinstance(title_field, dict) else "")
+    title = html.unescape(
+        title_field.get("rendered", "") if isinstance(title_field, dict) else ""
+    )
 
     qs = NotificationDevice.objects.order_by("id")
 
@@ -142,7 +148,9 @@ def webhook_new_post(request: HttpRequest):
         try:
             logger.info("scheduling notification batch")
             link_raw = post.get("link")
-            extra = {"url": link_raw.replace("\\/", "/") if isinstance(link_raw, str) else ""}
+            extra = {
+                "url": link_raw.replace("\\/", "/") if isinstance(link_raw, str) else ""
+            }
             if image_url:
                 extra["richContent"] = {"image": image_url.replace("\\/", "/")}
 

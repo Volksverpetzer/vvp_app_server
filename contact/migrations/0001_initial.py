@@ -5,26 +5,48 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='ContactRequest',
+            name="ContactRequest",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('category', models.CharField(choices=[('report_fake', 'Fake melden'), ('app_feedback', 'App-Feedback'), ('other', 'Sonstiges')], max_length=20)),
-                ('title', models.CharField(max_length=500)),
-                ('message', models.TextField()),
-                ('app_variant', models.CharField(blank=True, default='', max_length=100)),
-                ('app_version', models.CharField(blank=True, default='', max_length=50)),
-                ('platform', models.CharField(blank=True, default='', max_length=50)),
-                ('dedupe_hash', models.CharField(max_length=64, unique=True)),
-                ('posted_to_asana', models.BooleanField(default=False)),
-                ('date', models.DateTimeField(auto_now_add=True, null=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                (
+                    "category",
+                    models.CharField(
+                        choices=[
+                            ("report_fake", "Fake melden"),
+                            ("app_feedback", "App-Feedback"),
+                            ("other", "Sonstiges"),
+                        ],
+                        max_length=20,
+                    ),
+                ),
+                ("title", models.CharField(max_length=500)),
+                ("message", models.TextField()),
+                (
+                    "app_variant",
+                    models.CharField(blank=True, default="", max_length=100),
+                ),
+                (
+                    "app_version",
+                    models.CharField(blank=True, default="", max_length=50),
+                ),
+                ("platform", models.CharField(blank=True, default="", max_length=50)),
+                ("dedupe_hash", models.CharField(max_length=64, unique=True)),
+                ("posted_to_asana", models.BooleanField(default=False)),
+                ("date", models.DateTimeField(auto_now_add=True, null=True)),
             ],
         ),
     ]

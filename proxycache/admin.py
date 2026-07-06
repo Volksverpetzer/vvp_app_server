@@ -50,8 +50,7 @@ def clear_cache_view(request: HttpRequest) -> HttpResponse:
             cleared_aliases.append(alias)
         messages.success(
             request,
-            _("Cleared caches: %(aliases)s.")
-            % {"aliases": ", ".join(cleared_aliases)},
+            _("Cleared caches: %(aliases)s.") % {"aliases": ", ".join(cleared_aliases)},
         )
         return redirect("admin:index")
 

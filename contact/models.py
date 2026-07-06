@@ -30,6 +30,9 @@ class ContactRequest(models.Model):
     posted_to_asana = models.BooleanField(default=False)
     date = models.DateTimeField(auto_now_add=True, null=True)
 
+    def __str__(self) -> str:
+        return f"{self.category}: {self.title}"
+
     @staticmethod
     def build_dedupe_hash(**fields: str) -> str:
         """Hash the normalized payload fields for the uniqueness check.

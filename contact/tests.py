@@ -65,9 +65,7 @@ class ContactTests(TestCase):
         notes = mock_post.call_args.kwargs["json"]["data"]["notes"]
         self.assertIn("App: Volksverpetzer | 2.3.0 | ios", notes)
 
-    @patch.dict(
-        os.environ, ASANA_ENV | {"ASANA_SECTION_APP_FEEDBACK": "777"}
-    )
+    @patch.dict(os.environ, ASANA_ENV | {"ASANA_SECTION_APP_FEEDBACK": "777"})
     @patch("contact.asana.requests.post", return_value=asana_response())
     def test_category_section_is_used_when_configured(self, mock_post: MagicMock):
         response = self.post(
@@ -127,9 +125,7 @@ class ContactTests(TestCase):
         mock_post.assert_not_called()
 
     def test_invalid_category(self):
-        response = self.post(
-            {"category": "spam", "title": "t", "message": "m"}
-        )
+        response = self.post({"category": "spam", "title": "t", "message": "m"})
         self.assertEqual(response.status_code, 400)
         self.assertFalse(ContactRequest.objects.exists())
 
@@ -142,16 +138,12 @@ class ContactTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_invalid_json(self):
-        response = self.c.post(
-            "/contact", "not json", content_type="application/json"
-        )
+        response = self.c.post("/contact", "not json", content_type="application/json")
         self.assertEqual(response.status_code, 400)
 
     def test_non_object_json_is_rejected(self):
         for body in ('"a string"', "[1, 2]", "42", "null"):
-            response = self.c.post(
-                "/contact", body, content_type="application/json"
-            )
+            response = self.c.post("/contact", body, content_type="application/json")
             self.assertEqual(response.status_code, 400)
 
     @patch.dict(os.environ, {}, clear=True)
@@ -196,9 +188,7 @@ class ContactTests(TestCase):
 
     @patch.dict(os.environ, ASANA_ENV)
     @patch("contact.asana.requests.post", return_value=asana_response())
-    def test_dedupe_hit_on_unposted_row_reattempts_post(
-        self, mock_post: MagicMock
-    ):
+    def test_dedupe_hit_on_unposted_row_reattempts_post(self, mock_post: MagicMock):
         # Simulates the concurrent-duplicate race: the row exists but the
         # Asana task was never created. The duplicate must not report
         # success without posting.
@@ -224,9 +214,7 @@ class ContactTests(TestCase):
     def test_dedupe_hash_is_not_ambiguous(self):
         # With a naive delimiter-joined serialization these two payloads
         # would collapse to the same canonical string.
-        first = ContactRequest.build_dedupe_hash(
-            message="m\x1fplatform=p", platform=""
-        )
+        first = ContactRequest.build_dedupe_hash(message="m\x1fplatform=p", platform="")
         second = ContactRequest.build_dedupe_hash(
             message="m", platform="p\x1fplatform="
         )

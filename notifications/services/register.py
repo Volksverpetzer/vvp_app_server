@@ -52,7 +52,9 @@ def register(request: HttpRequest) -> JsonResponse:
         new_fact_check = settings["new_fact_check"]["value"]
         # Optional: older app versions don't send this key. Only update when
         # present so we keep the device's current value (default off).
-        pruefpunkt = settings.get("new_pruefpunkt") if isinstance(settings, dict) else None
+        pruefpunkt = (
+            settings.get("new_pruefpunkt") if isinstance(settings, dict) else None
+        )
         new_pruefpunkt = (
             pruefpunkt["value"]
             if isinstance(pruefpunkt, dict) and "value" in pruefpunkt
