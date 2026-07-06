@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 
 from django.db import models
@@ -20,4 +21,15 @@ class ContactRequest(models.Model):
     app_variant = models.CharField(max_length=100, default="", blank=True)
     app_version = models.CharField(max_length=50, default="", blank=True)
     platform = models.CharField(max_length=50, default="", blank=True)
+    # Hash over the normalized payload; the unique constraint makes the
+    # double-submit dedupe atomic (a TextField can't go into an index).
+    dedupe_hash = models.CharField(max_length=64, unique=True)
     date = models.DateTimeField(auto_now_add=True, null=True)
+
+    @staticmethod
+    def build_dedupe_hash(**fields: str) -> str:
+        """Hash the normalized payload fields for the uniqueness check."""
+        joined = "\x1f".join(
+            f"{key}={fields[key]}" for key in sorted(fields)
+        )
+        return hashlib.sha256(joined.encode()).hexdigest()

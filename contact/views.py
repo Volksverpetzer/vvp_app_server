@@ -77,7 +77,7 @@ def contact(request: HttpRequest):
         value = data.get(key)
         return value.strip()[:max_length] if isinstance(value, str) else ""
 
-    filterset = {
+    fields = {
         "category": category,
         "title": title,
         "message": message,
@@ -86,10 +86,14 @@ def contact(request: HttpRequest):
         "platform": meta("platform", 50),
     }
 
-    # Check if this exact request already exists (e.g. double tap on submit)
-    contact_request = ContactRequest.objects.filter(**filterset).first()
-    if not contact_request:
-        contact_request = ContactRequest.objects.create(**filterset)
+    # Dedupe double-submits atomically: the unique hash column collapses
+    # concurrent identical POSTs into a single row (get_or_create retries
+    # the lookup on IntegrityError).
+    contact_request, created_row = ContactRequest.objects.get_or_create(
+        dedupe_hash=ContactRequest.build_dedupe_hash(**fields),
+        defaults=fields,
+    )
+    if created_row:
         label = CATEGORY_LABELS[ContactRequest.Category(category)]
         client = " | ".join(
             part

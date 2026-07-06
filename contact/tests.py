@@ -2,6 +2,7 @@ import json
 import os
 from unittest.mock import MagicMock, patch
 
+from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 
 from .models import ContactRequest
@@ -185,3 +186,19 @@ class ContactTests(TestCase):
         self.assertEqual(first["id"], second["id"])
         self.assertEqual(ContactRequest.objects.count(), 1)
         mock_post.assert_called_once()
+
+    def test_dedupe_is_enforced_at_the_database_level(self):
+        # Concurrent identical POSTs may both pass an application-level
+        # existence check; the unique hash column collapses them.
+        fields = {
+            "category": "other",
+            "title": "t",
+            "message": "m",
+            "app_variant": "",
+            "app_version": "",
+            "platform": "",
+        }
+        dedupe_hash = ContactRequest.build_dedupe_hash(**fields)
+        ContactRequest.objects.create(dedupe_hash=dedupe_hash, **fields)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            ContactRequest.objects.create(dedupe_hash=dedupe_hash, **fields)
