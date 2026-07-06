@@ -1,7 +1,6 @@
 """Views for the contact app."""
 
 import json
-import logging
 
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -11,8 +10,6 @@ from django_ratelimit.decorators import (  # type: ignore[reportMissingTypeStubs
 
 from .asana import create_asana_task
 from .models import ContactRequest
-
-logger = logging.getLogger(__name__)
 
 CATEGORY_LABELS = {
     ContactRequest.Category.REPORT_FAKE: "Fake-Report",
