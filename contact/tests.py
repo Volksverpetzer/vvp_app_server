@@ -124,6 +124,44 @@ class ContactTests(TestCase):
         self.assertFalse(json.loads(response.content)["success"])
         mock_post.assert_not_called()
 
+    @patch.dict(os.environ, ASANA_ENV)
+    @patch("contact.asana.requests.post", return_value=asana_response())
+    def test_email_is_stored_and_in_notes(self, mock_post: MagicMock):
+        response = self.post(
+            {
+                "category": "other",
+                "title": "t",
+                "message": "eine Nachricht",
+                "email": "user@example.com",
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ContactRequest.objects.get().email, "user@example.com")
+        notes = mock_post.call_args.kwargs["json"]["data"]["notes"]
+        self.assertIn("E-Mail: user@example.com", notes)
+
+    @patch.dict(os.environ, ASANA_ENV)
+    @patch("contact.asana.requests.post", return_value=asana_response())
+    def test_email_is_optional(self, mock_post: MagicMock):
+        response = self.post(
+            {"category": "other", "title": "t", "message": "eine Nachricht"}
+        )
+        self.assertEqual(response.status_code, 200)
+        notes = mock_post.call_args.kwargs["json"]["data"]["notes"]
+        self.assertIn("E-Mail: nicht angegeben", notes)
+
+    def test_invalid_email_is_rejected(self):
+        response = self.post(
+            {
+                "category": "other",
+                "title": "t",
+                "message": "eine Nachricht",
+                "email": "kein-at-zeichen",
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(ContactRequest.objects.exists())
+
     def test_invalid_category(self):
         response = self.post({"category": "spam", "title": "t", "message": "m"})
         self.assertEqual(response.status_code, 400)
@@ -196,6 +234,7 @@ class ContactTests(TestCase):
             "category": "other",
             "title": "t",
             "message": "eine Nachricht",
+            "email": "",
             "app_variant": "",
             "app_version": "",
             "platform": "",

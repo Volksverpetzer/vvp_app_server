@@ -22,6 +22,8 @@ class ContactRequest(models.Model):
     app_variant = models.CharField(max_length=100, default="", blank=True)
     app_version = models.CharField(max_length=50, default="", blank=True)
     platform = models.CharField(max_length=50, default="", blank=True)
+    # Optional reply address the user can leave for follow-up questions.
+    email = models.EmailField(default="", blank=True)
     # Hash over the normalized payload; the unique constraint makes the
     # double-submit dedupe atomic (a TextField can't go into an index).
     dedupe_hash = models.CharField(max_length=64, unique=True)

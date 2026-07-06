@@ -2,6 +2,8 @@
 
 import json
 
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import (  # type: ignore[reportMissingTypeStubs]
@@ -73,6 +75,16 @@ def contact(request: HttpRequest):
         return JsonResponse({"success": False, "error": "Missing message"}, status=400)
     message = message.strip()
 
+    email = data.get("email")
+    email = email.strip() if isinstance(email, str) else ""
+    if email:
+        try:
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse(
+                {"success": False, "error": "Invalid email"}, status=400
+            )
+
     def meta(key: str, max_length: int) -> str:
         value = data.get(key)
         return value.strip()[:max_length] if isinstance(value, str) else ""
@@ -81,6 +93,7 @@ def contact(request: HttpRequest):
         "category": category,
         "title": title,
         "message": message,
+        "email": email,
         "app_variant": meta("app_variant", 100),
         "app_version": meta("app_version", 50),
         "platform": meta("platform", 50),
@@ -109,6 +122,7 @@ def contact(request: HttpRequest):
             notes=(
                 f"{message}\n\n"
                 f"Kategorie: {label}\n"
+                f"E-Mail: {contact_request.email or 'nicht angegeben'}\n"
                 f"App: {client or 'unbekannt'}\n"
                 f"ID: {contact_request.id}"
             ),
