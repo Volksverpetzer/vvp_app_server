@@ -84,6 +84,22 @@ class ContactTests(TestCase):
 
     @patch.dict(os.environ, ASANA_ENV)
     @patch("contact.asana.requests.post", return_value=asana_response())
+    def test_long_title_is_truncated_consistently(self, mock_post: MagicMock):
+        response = self.post(
+            {
+                "category": "other",
+                "title": "x" * 600,
+                "message": "eine Nachricht",
+            }
+        )
+        self.assertEqual(response.status_code, 200)
+        stored_title = ContactRequest.objects.get().title
+        self.assertEqual(len(stored_title), 500)
+        payload = mock_post.call_args.kwargs["json"]["data"]
+        self.assertEqual(payload["name"], f"Sonstiges | {stored_title}")
+
+    @patch.dict(os.environ, ASANA_ENV)
+    @patch("contact.asana.requests.post", return_value=asana_response())
     def test_send_fake_report(self, mock_post: MagicMock):
         response = self.post(
             {

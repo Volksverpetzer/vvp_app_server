@@ -84,8 +84,8 @@ def reportFake(request: HttpRequest):
         created = create_asana_task(
             name=f"Fake-Report | {report.url}",
             notes=(
-                f"{report.description}\n\n"
-                f"Weitere Links: {report.more_info}\n"
+                f"{report.description or ''}\n\n"
+                f"Weitere Links: {report.more_info or ''}\n"
                 f"Kategorie: Fake-Report (Legacy-App)\n"
                 f"ID: {report.id}"
             ),

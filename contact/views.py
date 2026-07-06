@@ -54,7 +54,8 @@ def contact(request: HttpRequest):
     title = data.get("title")
     if not isinstance(title, str) or not title.strip():
         return JsonResponse({"success": False, "error": "Missing title"}, status=400)
-    title = title.strip()
+    # Truncate once so the stored row and the Asana task always match
+    title = title.strip()[:500]
 
     if category == ContactRequest.Category.REPORT_FAKE and not title.lower().startswith(
         ("http://", "https://")
@@ -78,7 +79,7 @@ def contact(request: HttpRequest):
 
     filterset = {
         "category": category,
-        "title": title[:500],
+        "title": title,
         "message": message,
         "app_variant": meta("app_variant", 100),
         "app_version": meta("app_version", 50),
