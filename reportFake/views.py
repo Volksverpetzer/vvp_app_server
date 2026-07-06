@@ -1,11 +1,16 @@
-"""Views for the reportFake app."""
+"""Views for the reportFake app.
+
+LEGACY: current app versions submit fake reports through the generic
+``contact`` app instead. This pipeline (report -> triage -> Bluesky
+publish -> status polling) stays active for backward compatibility
+with older app versions and in case we want to revive it later.
+"""
 
 import json
 import logging
 import os
 import uuid
 
-import requests
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, JsonResponse
@@ -15,6 +20,7 @@ from django_ratelimit.decorators import (  # type: ignore[reportMissingTypeStubs
     ratelimit,
 )
 
+from contact.asana import create_asana_task
 from notifications.helper import send_push_message
 from notifications.models import NotificationDevice
 
@@ -73,27 +79,25 @@ def reportFake(request: HttpRequest):
     report = FakeReport.objects.filter(**filterset).first()
     if not report:
         report = FakeReport.objects.create(**filterset)
-        api_key = os.environ.get("MAILGUN_TOKEN")
-        domain = os.environ.get("MAILGUN_DOMAIN")
-        receiver = os.environ.get("MAILGUN_RECEIVER")
-        if not api_key or not domain or not receiver:
-            return JsonResponse({"success": False})
-        result = requests.post(
-            f"https://api.eu.mailgun.net/v3/{domain}/messages",
-            auth=("api", api_key),
-            data={
-                "from": f"Excited User <mailgun@{domain}>",
-                "to": [receiver],
-                "subject": f"Fake Report | {report.id}",
-                "text": (
-                    f"{report.description}, {report.url}, "
-                    f"{report.more_info}, {report.id}"
-                ),
-            },
-            timeout=10,
+    if not report.posted_to_asana:
+        # Old app versions post here; put their reports on the same Asana
+        # board as the contact app so fake reports converge in one inbox.
+        created = create_asana_task(
+            name=f"Fake-Report | {report.url}",
+            notes=(
+                f"{report.description or ''}\n\n"
+                f"Weitere Links: {report.more_info or ''}\n"
+                f"Kategorie: Fake-Report (Legacy-App)\n"
+                f"ID: {report.id}"
+            ),
+            category="report_fake",
         )
-        if result.status_code != 200:
+        if not created:
+            # Keep the row unposted so retries and concurrent duplicates
+            # re-attempt the Asana post instead of deduping into success.
             return JsonResponse({"success": False})
+        report.posted_to_asana = True
+        report.save(update_fields=["posted_to_asana"])
     return JsonResponse({"success": True, "id": report.id})
 
 

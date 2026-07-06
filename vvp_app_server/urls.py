@@ -22,7 +22,9 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("notifications.urls")),
     path("", include("factApi.urls")),
+    # Legacy, only used by old app versions; superseded by the contact app.
     path("", include("reportFake.urls")),
+    path("", include("contact.urls")),
     path("", include("info.urls")),
     path("", include("payment.urls")),
     path("proxy/", include("proxycache.urls")),

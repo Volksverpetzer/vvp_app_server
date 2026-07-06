@@ -1,3 +1,20 @@
+# [1.3.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.2.0...v1.3.0) (2026-07-06)
+
+
+### Features
+
+* **Contact** — add a generic `contact` endpoint (`report_fake`, `app_feedback`, `other`) that files each submission as an Asana task, with per-category board sections and client metadata (app variant, version, platform) captured for triage
+* **Report a fake** — route submissions to Asana instead of Mailgun email; new and legacy app reports now converge in one Asana inbox
+
+> **⚠️ Breaking (ops):** report-a-fake now posts to Asana, not Mailgun. Set `ASANA_TOKEN` and `ASANA_PROJECT_GID` (and optionally the `ASANA_SECTION_*` gids) and remove the obsolete `MAILGUN_DOMAIN`/`MAILGUN_RECEIVER`/`MAILGUN_TOKEN` vars.
+
+
+### Chores
+
+* **Report a fake** — mark the report → triage → Bluesky publish pipeline as legacy, kept for older app versions
+* **Docs** — document the Asana env vars in `.env.sample` and drop the obsolete Mailgun entries
+
+
 # [1.2.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.1.0...v1.2.0) (2026-06-24)
 
 

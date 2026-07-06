@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     "notifications",
     "factApi",
     "reportFake",
+    "contact",
     "payment",
     "proxycache",
     "info",
