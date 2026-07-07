@@ -78,6 +78,13 @@ def contact(request: HttpRequest):
     email = data.get("email")
     email = email.strip() if isinstance(email, str) else ""
     if email:
+        # Reject (not truncate — a truncated address is useless) anything
+        # longer than the EmailField's max_length; validate_email only
+        # checks the format, not the total length.
+        if len(email) > 254:
+            return JsonResponse(
+                {"success": False, "error": "Invalid email"}, status=400
+            )
         try:
             validate_email(email)
         except ValidationError:
@@ -93,11 +100,14 @@ def contact(request: HttpRequest):
         "category": category,
         "title": title,
         "message": message,
-        "email": email,
         "app_variant": meta("app_variant", 100),
         "app_version": meta("app_version", 50),
         "platform": meta("platform", 50),
     }
+    if email:
+        # Only part of the payload (and dedupe hash) when provided, so
+        # email-less submissions keep hashing like pre-email deployments
+        fields["email"] = email
 
     # Dedupe double-submits atomically: the unique hash column collapses
     # concurrent identical POSTs into a single row (get_or_create retries

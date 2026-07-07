@@ -150,6 +150,21 @@ class ContactTests(TestCase):
         notes = mock_post.call_args.kwargs["json"]["data"]["notes"]
         self.assertIn("E-Mail: nicht angegeben", notes)
 
+    def test_overlong_email_is_rejected(self):
+        # Syntactically valid but longer than the EmailField's max_length
+        email = "a" * 64 + "@" + ("b" * 63 + ".") * 3 + "com"
+        self.assertGreater(len(email), 254)
+        response = self.post(
+            {
+                "category": "other",
+                "title": "t",
+                "message": "eine Nachricht",
+                "email": email,
+            }
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(ContactRequest.objects.exists())
+
     def test_invalid_email_is_rejected(self):
         response = self.post(
             {
@@ -230,11 +245,12 @@ class ContactTests(TestCase):
         # Simulates the concurrent-duplicate race: the row exists but the
         # Asana task was never created. The duplicate must not report
         # success without posting.
+        # No email key: an email-less payload must hash like pre-email
+        # deployments so dedupe keeps working across the migration
         fields = {
             "category": "other",
             "title": "t",
             "message": "eine Nachricht",
-            "email": "",
             "app_variant": "",
             "app_version": "",
             "platform": "",
