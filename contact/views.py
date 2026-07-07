@@ -14,7 +14,8 @@ from .asana import create_asana_task
 from .models import ContactRequest
 
 # Derived from the model so view validation can't drift from the DB limit
-EMAIL_MAX_LENGTH = ContactRequest._meta.get_field("email").max_length or 254
+_email_field = ContactRequest._meta.get_field("email")
+EMAIL_MAX_LENGTH = getattr(_email_field, "max_length", None) or 254
 
 CATEGORY_LABELS = {
     ContactRequest.Category.REPORT_FAKE: "Fake-Report",
