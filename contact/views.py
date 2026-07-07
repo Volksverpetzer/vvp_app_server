@@ -13,6 +13,9 @@ from django_ratelimit.decorators import (  # type: ignore[reportMissingTypeStubs
 from .asana import create_asana_task
 from .models import ContactRequest
 
+# Derived from the model so view validation can't drift from the DB limit
+EMAIL_MAX_LENGTH = ContactRequest._meta.get_field("email").max_length or 254
+
 CATEGORY_LABELS = {
     ContactRequest.Category.REPORT_FAKE: "Fake-Report",
     ContactRequest.Category.APP_FEEDBACK: "App-Feedback",
@@ -81,7 +84,7 @@ def contact(request: HttpRequest):
         # Reject (not truncate — a truncated address is useless) anything
         # longer than the EmailField's max_length; validate_email only
         # checks the format, not the total length.
-        if len(email) > 254:
+        if len(email) > EMAIL_MAX_LENGTH:
             return JsonResponse(
                 {"success": False, "error": "Invalid email"}, status=400
             )
