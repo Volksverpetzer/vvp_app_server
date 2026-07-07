@@ -2,6 +2,8 @@
 
 import json
 
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import (  # type: ignore[reportMissingTypeStubs]
@@ -10,6 +12,10 @@ from django_ratelimit.decorators import (  # type: ignore[reportMissingTypeStubs
 
 from .asana import create_asana_task
 from .models import ContactRequest
+
+# Derived from the model so view validation can't drift from the DB limit
+_email_field = ContactRequest._meta.get_field("email")
+EMAIL_MAX_LENGTH = getattr(_email_field, "max_length", None) or 254
 
 CATEGORY_LABELS = {
     ContactRequest.Category.REPORT_FAKE: "Fake-Report",
@@ -73,6 +79,23 @@ def contact(request: HttpRequest):
         return JsonResponse({"success": False, "error": "Missing message"}, status=400)
     message = message.strip()
 
+    email = data.get("email")
+    email = email.strip() if isinstance(email, str) else ""
+    if email:
+        # Reject (not truncate — a truncated address is useless) anything
+        # longer than the EmailField's max_length; validate_email only
+        # checks the format, not the total length.
+        if len(email) > EMAIL_MAX_LENGTH:
+            return JsonResponse(
+                {"success": False, "error": "Invalid email"}, status=400
+            )
+        try:
+            validate_email(email)
+        except ValidationError:
+            return JsonResponse(
+                {"success": False, "error": "Invalid email"}, status=400
+            )
+
     def meta(key: str, max_length: int) -> str:
         value = data.get(key)
         return value.strip()[:max_length] if isinstance(value, str) else ""
@@ -85,6 +108,10 @@ def contact(request: HttpRequest):
         "app_version": meta("app_version", 50),
         "platform": meta("platform", 50),
     }
+    if email:
+        # Only part of the payload (and dedupe hash) when provided, so
+        # email-less submissions keep hashing like pre-email deployments
+        fields["email"] = email
 
     # Dedupe double-submits atomically: the unique hash column collapses
     # concurrent identical POSTs into a single row (get_or_create retries
@@ -109,6 +136,7 @@ def contact(request: HttpRequest):
             notes=(
                 f"{message}\n\n"
                 f"Kategorie: {label}\n"
+                f"E-Mail: {contact_request.email or 'nicht angegeben'}\n"
                 f"App: {client or 'unbekannt'}\n"
                 f"ID: {contact_request.id}"
             ),
