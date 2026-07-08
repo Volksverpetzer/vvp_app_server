@@ -195,6 +195,10 @@ class ContactTests(TestCase):
         response = self.c.post("/contact", "not json", content_type="application/json")
         self.assertEqual(response.status_code, 400)
 
+    def test_invalid_utf8_body_is_rejected(self):
+        response = self.c.post("/contact", b"\xff\xfe", content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+
     def test_non_object_json_is_rejected(self):
         for body in ('"a string"', "[1, 2]", "42", "null"):
             response = self.c.post("/contact", body, content_type="application/json")

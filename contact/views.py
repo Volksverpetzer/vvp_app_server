@@ -50,7 +50,9 @@ def contact(request: HttpRequest):
 
     try:
         data = json.loads(request.body)
-    except json.JSONDecodeError:
+    except ValueError:
+        # ValueError also catches UnicodeDecodeError (invalid UTF-8 bytes),
+        # which json.JSONDecodeError alone would miss.
         return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
     if not isinstance(data, dict):
         return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
