@@ -60,6 +60,12 @@ def register(request: HttpRequest) -> JsonResponse:
             if isinstance(pruefpunkt, dict) and "value" in pruefpunkt
             else None
         )
+        if (
+            not isinstance(new_post, bool)
+            or not isinstance(new_fact_check, bool)
+            or (new_pruefpunkt is not None and not isinstance(new_pruefpunkt, bool))
+        ):
+            raise TypeError("settings values must be boolean")
     except (KeyError, TypeError) as e:
         logger.warning("Invalid settings payload: %s", e)
         return JsonResponse({"error": "invalid settings"}, status=400)

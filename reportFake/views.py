@@ -65,9 +65,9 @@ def reportFake(request: HttpRequest):
         data = json.loads(request.body)
     except ValueError as e:
         logger.error("Invalid JSON payload: %s", e)
-        return JsonResponse({"success": False, "error": "invalid JSON"}, status=400)
+        return JsonResponse({"success": False, "error": "invalid JSON"})
     if not isinstance(data, dict):
-        return JsonResponse({"success": False, "error": "invalid JSON"}, status=400)
+        return JsonResponse({"success": False, "error": "invalid JSON"})
 
     url = data.get("url")
     if not isinstance(url, str) or not url.lower().startswith(("http://", "https://")):
