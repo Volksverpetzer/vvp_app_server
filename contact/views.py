@@ -16,6 +16,8 @@ from .models import ContactRequest
 # Derived from the model so view validation can't drift from the DB limit
 _email_field = ContactRequest._meta.get_field("email")
 EMAIL_MAX_LENGTH = getattr(_email_field, "max_length", None) or 254
+_title_field = ContactRequest._meta.get_field("title")
+TITLE_MAX_LENGTH = getattr(_title_field, "max_length", None) or 500
 
 CATEGORY_LABELS = {
     ContactRequest.Category.REPORT_FAKE: "Fake-Report",
@@ -48,7 +50,9 @@ def contact(request: HttpRequest):
 
     try:
         data = json.loads(request.body)
-    except json.JSONDecodeError:
+    except ValueError:
+        # ValueError also catches UnicodeDecodeError (invalid UTF-8 bytes),
+        # which json.JSONDecodeError alone would miss.
         return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
     if not isinstance(data, dict):
         return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
@@ -61,7 +65,7 @@ def contact(request: HttpRequest):
     if not isinstance(title, str) or not title.strip():
         return JsonResponse({"success": False, "error": "Missing title"}, status=400)
     # Truncate once so the stored row and the Asana task always match
-    title = title.strip()[:500]
+    title = title.strip()[:TITLE_MAX_LENGTH]
 
     if category == ContactRequest.Category.REPORT_FAKE and not title.lower().startswith(
         ("http://", "https://")

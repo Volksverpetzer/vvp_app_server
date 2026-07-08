@@ -6,6 +6,7 @@ from django.db import IntegrityError, transaction
 from django.test import Client, TestCase, override_settings
 
 from .models import ContactRequest
+from .views import TITLE_MAX_LENGTH
 
 ASANA_ENV = {"ASANA_TOKEN": "token", "ASANA_PROJECT_GID": "12345"}
 
@@ -87,13 +88,13 @@ class ContactTests(TestCase):
         response = self.post(
             {
                 "category": "other",
-                "title": "x" * 600,
+                "title": "x" * (TITLE_MAX_LENGTH + 100),
                 "message": "eine Nachricht",
             }
         )
         self.assertEqual(response.status_code, 200)
         stored_title = ContactRequest.objects.get().title
-        self.assertEqual(len(stored_title), 500)
+        self.assertEqual(len(stored_title), TITLE_MAX_LENGTH)
         payload = mock_post.call_args.kwargs["json"]["data"]
         self.assertEqual(payload["name"], f"Sonstiges | {stored_title}")
 
@@ -192,6 +193,10 @@ class ContactTests(TestCase):
 
     def test_invalid_json(self):
         response = self.c.post("/contact", "not json", content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+
+    def test_invalid_utf8_body_is_rejected(self):
+        response = self.c.post("/contact", b"\xff\xfe", content_type="application/json")
         self.assertEqual(response.status_code, 400)
 
     def test_non_object_json_is_rejected(self):
