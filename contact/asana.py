@@ -57,10 +57,9 @@ def create_asana_task(name: str, notes: str, category: str | None = None) -> boo
         return False
 
     if response.status_code != 201:
-        logger.error(
-            "Asana task creation failed (%s): %s",
-            response.status_code,
-            response.text[:500],
-        )
+        # Don't log the response body at error level: Asana can echo
+        # submitted fields (task notes/email) back in its error payload.
+        logger.error("Asana task creation failed (status %s)", response.status_code)
+        logger.debug("Asana error response body: %s", response.text[:500])
         return False
     return True
