@@ -1,6 +1,7 @@
 import io
 import logging
 import os
+from datetime import datetime
 from typing import Optional
 
 import geopandas as gpd
@@ -37,6 +38,21 @@ def _resolve_site(request: HttpRequest) -> tuple[str, JsonResponse | None]:
     return site, None
 
 
+def _fetched_at(entry: Optional[dict]) -> Optional[datetime]:
+    """Read fetched_at from a cache entry as a timezone-aware datetime.
+
+    Cache entries written before timezone.now() replaced datetime.now()
+    (see #16) may still be sitting in the persistent cache with a naive
+    fetched_at, which would raise TypeError when compared to timezone.now().
+    """
+    if not entry:
+        return None
+    ts = entry.get("fetched_at")
+    if ts is not None and timezone.is_naive(ts):
+        ts = timezone.make_aware(ts, timezone.get_current_timezone())
+    return ts
+
+
 # Population data for German states
 REGION_MAPPING = {
     "NW": {"name": "Nordrh.-Westf.", "population": 17933000},
@@ -70,12 +86,10 @@ def shares(request: HttpRequest, path: Optional[str] = None) -> HttpResponse:
     cache_key = "analytics:shares:" + request.get_full_path()
     entry = cache_get(cache_key)
     cached_data = entry.get("data") if entry else None
+    fetched_at = _fetched_at(entry)
     headers = {"Authorization": "Bearer " + os.environ["PLAUSIBLE_TOKEN"]}
     # serve cache if fresh
-    if (
-        entry
-        and (timezone.now() - entry["fetched_at"]).total_seconds() < SHORT_CACHE_TTL
-    ):
+    if fetched_at and (timezone.now() - fetched_at).total_seconds() < SHORT_CACHE_TTL:
         return JsonResponse(cached_data)
     # live fetch
     payload = {
@@ -105,7 +119,7 @@ def shares(request: HttpRequest, path: Optional[str] = None) -> HttpResponse:
         if cached_data is not None:
             cache_set(
                 cache_key,
-                {"data": cached_data, "fetched_at": entry["fetched_at"]},
+                {"data": cached_data, "fetched_at": fetched_at},
                 LONG_CACHE_TTL,
             )
             return JsonResponse(cached_data)
@@ -120,7 +134,7 @@ def links(request: HttpRequest, remaining: str) -> HttpResponse:
     cache_key = "analytics:links:" + request.get_full_path()
     entry = cache_get(cache_key)
     cached_data = entry.get("data") if entry else None
-    fetched_at = entry.get("fetched_at") if entry else None
+    fetched_at = _fetched_at(entry)
     # serve cache if fresh
     if fetched_at and (timezone.now() - fetched_at).total_seconds() < SHORT_CACHE_TTL:
         return JsonResponse(cached_data)

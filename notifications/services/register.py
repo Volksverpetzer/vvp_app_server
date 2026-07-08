@@ -62,7 +62,7 @@ def register(request: HttpRequest) -> JsonResponse:
         )
     except (KeyError, TypeError) as e:
         logger.warning("Invalid settings payload: %s", e)
-        return JsonResponse({"error": f"invalid settings: {e}"}, status=400)
+        return JsonResponse({"error": "invalid settings"}, status=400)
 
     try:
         device, created = NotificationDevice.objects.get_or_create(expo_token=token)
