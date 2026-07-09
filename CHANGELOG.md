@@ -1,3 +1,11 @@
+# [1.3.1](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.0...v1.3.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* **Report a fake** — return a non-2xx status (`400` for invalid input, `502` for a failed/duplicate Asana post) from the legacy `/reportFake` endpoint instead of `200`; old app clients only inspect the response body for an `id` and treated any `200` as success, then polled `/statusFake/undefined` and got a `404` ([#23](https://github.com/Volksverpetzer/vvp_app_server/issues/23))
+
+
 # [1.3.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.2.0...v1.3.0) (2026-07-06)
 
 
