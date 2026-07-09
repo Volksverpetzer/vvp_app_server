@@ -65,9 +65,9 @@ def reportFake(request: HttpRequest):
         data = json.loads(request.body)
     except ValueError as e:
         logger.error("Invalid JSON payload: %s", e)
-        return JsonResponse({"success": False, "error": "invalid JSON"})
+        return JsonResponse({"success": False, "error": "invalid JSON"}, status=400)
     if not isinstance(data, dict):
-        return JsonResponse({"success": False, "error": "invalid JSON"})
+        return JsonResponse({"success": False, "error": "invalid JSON"}, status=400)
 
     url = data.get("url")
     if not isinstance(url, str) or not url.lower().startswith(("http://", "https://")):
@@ -75,7 +75,8 @@ def reportFake(request: HttpRequest):
             {
                 "success": False,
                 "error": "Invalid URL format. URL must start with http:// or https://",
-            }
+            },
+            status=400,
         )
 
     filterset = {
@@ -106,7 +107,9 @@ def reportFake(request: HttpRequest):
         if not created:
             # Keep the row unposted so retries and concurrent duplicates
             # re-attempt the Asana post instead of deduping into success.
-            return JsonResponse({"success": False})
+            # Non-2xx so the client doesn't show a false success screen
+            # or poll /statusFake with a missing id.
+            return JsonResponse({"success": False}, status=502)
         report.posted_to_asana = True
         report.save(update_fields=["posted_to_asana"])
     return JsonResponse({"success": True, "id": report.id})
