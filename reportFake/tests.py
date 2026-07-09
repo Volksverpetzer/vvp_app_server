@@ -32,10 +32,11 @@ class Notification(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(json.loads(response.content)["success"])
-        self.assertEqual(
-            FakeReport.objects.filter(url="https://welt.de").exists(), True
-        )
+        data = json.loads(response.content)
+        self.assertTrue(data["success"])
+        self.assertIn("id", data)
+        report = FakeReport.objects.get(url="https://welt.de")
+        self.assertEqual(data["id"], str(report.id))
         # The legacy endpoint posts to the same Asana board as the contact app
         payload = mock_post.call_args.kwargs["json"]["data"]
         self.assertEqual(payload["name"], "Fake-Report | https://welt.de")
@@ -47,9 +48,10 @@ class Notification(TestCase):
             {"description": "d", "url": "javascript:alert(1)", "more_info": "m"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
         data = json.loads(response.content)
         self.assertFalse(data["success"])
+        self.assertNotIn("id", data)
         self.assertFalse(FakeReport.objects.filter(url="javascript:alert(1)").exists())
 
     @override_settings(RATELIMIT_ENABLE=False)
@@ -59,7 +61,7 @@ class Notification(TestCase):
             {"description": "d", "url": "welt.de", "more_info": "m"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
         self.assertFalse(json.loads(response.content)["success"])
 
     @override_settings(RATELIMIT_ENABLE=False)
@@ -69,7 +71,7 @@ class Notification(TestCase):
             {"description": "d", "url": 42, "more_info": "m"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
         self.assertFalse(json.loads(response.content)["success"])
 
     @override_settings(RATELIMIT_ENABLE=False)
@@ -79,7 +81,17 @@ class Notification(TestCase):
             {"description": "d", "more_info": "m"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(json.loads(response.content)["success"])
+
+    @override_settings(RATELIMIT_ENABLE=False)
+    def test_send_report_invalid_json_returns_400(self):
+        response = self.c.post(
+            "/reportFake",
+            data="not json",
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
         self.assertFalse(json.loads(response.content)["success"])
 
     @override_settings(RATELIMIT_ENABLE=False)
@@ -90,8 +102,10 @@ class Notification(TestCase):
             {"description": "d", "url": "https://example.com", "more_info": "m"},
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(json.loads(response.content)["success"])
+        self.assertEqual(response.status_code, 502)
+        data = json.loads(response.content)
+        self.assertFalse(data["success"])
+        self.assertNotIn("id", data)
 
     @override_settings(RATELIMIT_ENABLE=False)
     @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
@@ -107,8 +121,13 @@ class Notification(TestCase):
             },
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(json.loads(response.content)["success"])
+        # Must not be a 2xx: the client only extracts `id` from the body,
+        # so a 200 here previously produced a false "success" screen and a
+        # subsequent GET /statusFake/undefined -> 404.
+        self.assertEqual(response.status_code, 502)
+        data = json.loads(response.content)
+        self.assertFalse(data["success"])
+        self.assertNotIn("id", data)
         # The row is kept unposted so a retry reattempts the Asana post
         report = FakeReport.objects.get(url="https://example.com/unique1")
         self.assertFalse(report.posted_to_asana)
