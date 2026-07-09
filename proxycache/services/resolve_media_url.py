@@ -29,7 +29,8 @@ def resolve_media_url(request: HttpRequest):
         return HttpResponseForbidden("Invalid token.")
 
     cache_key = (
-        "resolve_media_url:" + hashlib.sha256(request.get_full_path().encode()).hexdigest()
+        "resolve_media_url:"
+        + hashlib.sha256(request.get_full_path().encode()).hexdigest()
     )
     cached = cache.get(cache_key)
     if cached:

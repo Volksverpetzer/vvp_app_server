@@ -11,6 +11,9 @@ class TiktokToken(models.Model):
     expires_in = models.IntegerField()
     date = models.DateTimeField(auto_now=True)
 
+    def __str__(self) -> str:
+        return f"TiktokToken (updated {self.date})"
+
 
 class InstaToken(models.Model):
     """Model for Instagram Token Storage. Multiple rows per account may
@@ -20,3 +23,6 @@ class InstaToken(models.Model):
     expires_in = models.IntegerField()
     date = models.DateTimeField(auto_now=True)
     account = models.CharField(max_length=100, default="volksverpetzer", db_index=True)
+
+    def __str__(self) -> str:
+        return f"InstaToken ({self.account})"

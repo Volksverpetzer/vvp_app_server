@@ -90,6 +90,7 @@ INSTALLED_APPS = [
     "notifications",
     "factApi",
     "reportFake",
+    "contact",
     "payment",
     "proxycache",
     "info",
@@ -270,9 +271,7 @@ LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s"
-        },  # noqa: E501
+        "verbose": {"format": "[%(asctime)s] %(levelname)s %(name)s: %(message)s"},  # noqa: E501
     },
     "handlers": {
         "console": {

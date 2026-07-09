@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import requests
 from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit  # type: ignore[reportMissingTypeStubs]
 from shapely import LineString, MultiLineString
@@ -35,6 +36,21 @@ def _resolve_site(request: HttpRequest) -> tuple[str, JsonResponse | None]:
     if site not in SITES:
         return "", JsonResponse({"error": "invalid site"}, status=400)
     return site, None
+
+
+def _fetched_at(entry: Optional[dict]) -> Optional[datetime]:
+    """Read fetched_at from a cache entry as a timezone-aware datetime.
+
+    Cache entries written before timezone.now() replaced datetime.now()
+    (see #16) may still be sitting in the persistent cache with a naive
+    fetched_at, which would raise TypeError when compared to timezone.now().
+    """
+    if not entry:
+        return None
+    ts = entry.get("fetched_at")
+    if ts is not None and timezone.is_naive(ts):
+        ts = timezone.make_aware(ts, timezone.get_current_timezone())
+    return ts
 
 
 # Population data for German states
@@ -70,12 +86,10 @@ def shares(request: HttpRequest, path: Optional[str] = None) -> HttpResponse:
     cache_key = "analytics:shares:" + request.get_full_path()
     entry = cache_get(cache_key)
     cached_data = entry.get("data") if entry else None
+    fetched_at = _fetched_at(entry)
     headers = {"Authorization": "Bearer " + os.environ["PLAUSIBLE_TOKEN"]}
     # serve cache if fresh
-    if (
-        entry
-        and (datetime.now() - entry["fetched_at"]).total_seconds() < SHORT_CACHE_TTL
-    ):
+    if fetched_at and (timezone.now() - fetched_at).total_seconds() < SHORT_CACHE_TTL:
         return JsonResponse(cached_data)
     # live fetch
     payload = {
@@ -98,14 +112,14 @@ def shares(request: HttpRequest, path: Optional[str] = None) -> HttpResponse:
         data = resp.json().get("results", [])
         result = {"events": data[0]["metrics"][0] if data else 0}
         cache_set(
-            cache_key, {"data": result, "fetched_at": datetime.now()}, SHORT_CACHE_TTL
+            cache_key, {"data": result, "fetched_at": timezone.now()}, SHORT_CACHE_TTL
         )
         return JsonResponse(result)
     except Exception:
         if cached_data is not None:
             cache_set(
                 cache_key,
-                {"data": cached_data, "fetched_at": entry["fetched_at"]},
+                {"data": cached_data, "fetched_at": fetched_at},
                 LONG_CACHE_TTL,
             )
             return JsonResponse(cached_data)
@@ -120,9 +134,9 @@ def links(request: HttpRequest, remaining: str) -> HttpResponse:
     cache_key = "analytics:links:" + request.get_full_path()
     entry = cache_get(cache_key)
     cached_data = entry.get("data") if entry else None
-    fetched_at = entry.get("fetched_at") if entry else None
+    fetched_at = _fetched_at(entry)
     # serve cache if fresh
-    if fetched_at and (datetime.now() - fetched_at).total_seconds() < SHORT_CACHE_TTL:
+    if fetched_at and (timezone.now() - fetched_at).total_seconds() < SHORT_CACHE_TTL:
         return JsonResponse(cached_data)
     # live fetch
     # live fetch headers
@@ -155,7 +169,7 @@ def links(request: HttpRequest, remaining: str) -> HttpResponse:
         result = {"links": links}
         cache_set(
             cache_key,
-            {"data": result, "fetched_at": datetime.now()},
+            {"data": result, "fetched_at": timezone.now()},
             SHORT_CACHE_TTL,
         )
         return JsonResponse(result)
@@ -185,6 +199,7 @@ def map(request: HttpRequest):
         return HttpResponse(entry["data"], content_type="image/png")
 
     import matplotlib
+
     matplotlib.use("Agg")
     url = "https://raw.githubusercontent.com/isellsoap/deutschlandGeoJSON/refs/heads/main/2_bundeslaender/4_niedrig.geo.json"
 
@@ -222,7 +237,7 @@ def map(request: HttpRequest):
 
             # Get population data for normalization
             region_info = REGION_MAPPING.get(key, {"population": 1})
-            # Normalize pageviews per 100,000 population (same formula as convert_to_csv)
+            # Normalize pageviews per 100k population (same formula as convert_to_csv)
             normalized_pageviews = pageviews / (region_info["population"] / 10**5)
 
             processed_data.append(
@@ -317,7 +332,8 @@ def get_delta(page: str, site: str = DEFAULT_SITE):
         # Check if response is valid before attempting to parse JSON
         if wpresp.status_code != 200:
             logger.warning(
-                f"WordPress API returned status code {wpresp.status_code} for slug {slug}"
+                f"WordPress API returned status code {wpresp.status_code} "
+                f"for slug {slug}"
             )
             return 0
 
@@ -380,7 +396,7 @@ def stats(request: HttpRequest, remaining: str) -> JsonResponse | HttpResponse:
         result = {"pageviews": pageviews}
         cache_set(
             cache_key,
-            {"data": result, "fetched_at": datetime.now()},
+            {"data": result, "fetched_at": timezone.now()},
             60 * 30 + date_delta,
         )
         return JsonResponse(result)
@@ -422,7 +438,7 @@ def faves(request: HttpRequest, remaining: str) -> JsonResponse | HttpResponse:
         events = results[0]["metrics"][0] if results else 0
         result = {"events": events}
         cache_set(
-            cache_key, {"data": result, "fetched_at": datetime.now()}, 60 * 60 * 24
+            cache_key, {"data": result, "fetched_at": timezone.now()}, 60 * 60 * 24
         )
         return JsonResponse(result)
     except Exception as e:
@@ -462,7 +478,7 @@ def regions(request: HttpRequest) -> JsonResponse | HttpResponse:
         csv = convert_to_csv(data)
         result = csv
         cache_set(
-            cache_key, {"data": result, "fetched_at": datetime.now()}, 60 * 60 * 24
+            cache_key, {"data": result, "fetched_at": timezone.now()}, 60 * 60 * 24
         )
         response = HttpResponse(result, content_type="text/csv")
         response["Content-Disposition"] = 'attachment; filename="region-stats.csv"'

@@ -7,7 +7,8 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 | App | Responsibility |
 |-----|----------------|
 | **factApi** | `/googleFact` — Google Fact Check API proxy |
-| **reportFake** | Fake-report submissions, triage, archiving, and Bluesky bot feed |
+| **contact** | `/contact` — generic contact requests (feedback, fake reports, other), posted to the Asana board |
+| **reportFake** | Legacy fake-report submissions (old app versions), triage, archiving, and Bluesky bot feed |
 | **notifications** | Device registration, push notification scheduling (Django-Q), and webhooks for new posts |
 | **payment** | Stripe payment intents |
 | **proxycache** | Social-media feed proxies (Instagram, Bluesky, TikTok, YouTube) and Plausible analytics proxy; caches responses |
@@ -19,7 +20,8 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 | Method | Path | App | Description |
 |--------|------|-----|-------------|
 | `POST` | `/googleFact` | factApi | Google Fact Check search |
-| `POST` | `/reportFake` | reportFake | Submit a fake-report |
+| `POST` | `/contact` | contact | Submit a contact request (creates an Asana task) |
+| `POST` | `/reportFake` | reportFake | Submit a fake-report (legacy, old app versions) |
 | `POST` | `/triageFake` | reportFake | Triage a report |
 | `POST` | `/archiveFake` | reportFake | Archive a report |
 | `POST` | `/assign-bluesky` | reportFake | Assign Bluesky post to report |
@@ -71,9 +73,11 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `TIKTOK_CLIENT_SECRET` | TikTok API client secret |
 | `TIKTOK_REFRESH_TOKEN` | TikTok OAuth refresh token (fallback when no DB token exists) |
 | `YT_ACCESS_TOKEN` | YouTube Data API v3 key |
-| `MAILGUN_DOMAIN` | Mailgun domain for sending report emails |
-| `MAILGUN_TOKEN` | Mailgun API token |
-| `MAILGUN_RECEIVER` | Email address to receive fake-report notifications |
+| `ASANA_TOKEN` | Asana personal access token (contact requests & fake reports) |
+| `ASANA_PROJECT_GID` | Asana project (board) gid that contact tasks are added to |
+| `ASANA_SECTION_REPORT_FAKE` | Board section gid for fake reports (optional) |
+| `ASANA_SECTION_APP_FEEDBACK` | Board section gid for app feedback (optional) |
+| `ASANA_SECTION_OTHER` | Board section gid for other requests (optional) |
 | `PLAUSIBLE_TOKEN` | Plausible Analytics API token |
 
 ## Local Development

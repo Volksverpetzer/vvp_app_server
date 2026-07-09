@@ -23,13 +23,12 @@ class ProxyTest(TestCase):
         mock_get.return_value.json.return_value = {"data": []}
         mock_refresh.return_value = ("dummy_token", 3600)  # nosec
         InstaToken.objects.create(
-            token="dummy_token", expires_in=3600  # nosec
+            token="dummy_token",
+            expires_in=3600,  # nosec
         )
         response = self.c.get("/proxy/instaFeed")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            mock_get.call_args[1]["params"]["access_token"], "dummy_token"
-        )
+        self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "dummy_token")
         response2 = self.c.get("/proxy/instaFeed")
         self.assertEqual(response.json(), response2.json())
 
@@ -39,7 +38,8 @@ class ProxyTest(TestCase):
         mock_get.return_value.json.return_value = {"data": []}
         mock_refresh.return_value = ("dummy_token", 3600)  # nosec
         InstaToken.objects.create(
-            token="vvp_token", expires_in=3600  # nosec
+            token="vvp_token",
+            expires_in=3600,  # nosec
         )
         InstaToken.objects.create(
             token="pp_token",  # nosec
@@ -142,9 +142,7 @@ class ProxyTest(TestCase):
                 mock_get.call_args[1]["params"]["access_token"], "vvp_env_token"
             )
 
-            response = self.c.get(
-                "/proxy/instaFeed?account=pruefpunkt&cachebust=env"
-            )
+            response = self.c.get("/proxy/instaFeed?account=pruefpunkt&cachebust=env")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(
                 mock_get.call_args[1]["params"]["access_token"], "pp_env_token"
@@ -170,7 +168,8 @@ class ProxyTest(TestCase):
 
         # mock tiktok token in DB
         TiktokToken.objects.create(
-            token="dummy_token", expires_in=3600  # nosec
+            token="dummy_token",
+            expires_in=3600,  # nosec
         )
 
         response = self.c.get("/tiktok/tiktokFeed")
@@ -251,7 +250,9 @@ class ProxyTest(TestCase):
     def test_replace_media_urls_thumbnail(self):
         rf = RequestFactory()
         request = rf.get("/")
-        secure_base = request.build_absolute_uri(reverse("media_url")).replace("http://", "https://")
+        secure_base = request.build_absolute_uri(reverse("media_url")).replace(
+            "http://", "https://"
+        )
         orig = "http://example.com/thumb.jpg"
         data = {"thumbnail_url": orig, "media_url": orig}
         new = replace_media_urls(data, request)
@@ -342,7 +343,9 @@ class AnalyticsSiteTests(TestCase):
     def _mock_plausible(self, mock_post, value=42):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"results": [{"metrics": [value], "dimensions": []}]}
+        mock_resp.json.return_value = {
+            "results": [{"metrics": [value], "dimensions": []}]
+        }
         mock_post.return_value = mock_resp
 
     def _mock_wp(self, mock_get):
@@ -402,7 +405,9 @@ class AnalyticsSiteTests(TestCase):
     def test_stats_pruefpunkt_site(self, _cg, _cs, mock_get, mock_post):
         self._mock_plausible(mock_post)
         self._mock_wp(mock_get)
-        response = self.client.get(reverse("stats", args=["slug"]) + "?site=pruefpunkt.org")
+        response = self.client.get(
+            reverse("stats", args=["slug"]) + "?site=pruefpunkt.org"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_post.call_args[1]["json"]["site_id"], "pruefpunkt.org")
         self.assertIn("pruefpunkt.org", mock_get.call_args[0][0])
@@ -431,7 +436,9 @@ class AnalyticsSiteTests(TestCase):
     @patch("proxycache.services.analytics.cache_get", return_value=None)
     def test_faves_pruefpunkt_site(self, _cg, _cs, mock_post):
         self._mock_plausible(mock_post)
-        response = self.client.get(reverse("favs", args=["slug"]) + "?site=pruefpunkt.org")
+        response = self.client.get(
+            reverse("favs", args=["slug"]) + "?site=pruefpunkt.org"
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_post.call_args[1]["json"]["site_id"], "pruefpunkt.org")
 
@@ -528,6 +535,7 @@ class CacheUtilsTest(TestCase):
     def test_cache_get_warms_memory_from_persistent(self):
         from django.core.cache import caches
         from vvp_app_server.cache_utils import cache_get
+
         key = "test_warm_up_key"
         caches["default"].delete(key)
         caches["persistent"].set(key, {"x": 1}, 60)
@@ -577,12 +585,22 @@ class CacheUtilsTest(TestCase):
 
 class TiktokHelperTest(TestCase):
     @patch("proxycache.services.tiktok_feed.requests.post")
-    @patch.dict(os.environ, {"TIKTOK_CLIENT_KEY": "k", "TIKTOK_CLIENT_SECRET": "s", "TIKTOK_REFRESH_TOKEN": "rt"})
+    @patch.dict(
+        os.environ,
+        {
+            "TIKTOK_CLIENT_KEY": "k",
+            "TIKTOK_CLIENT_SECRET": "s",
+            "TIKTOK_REFRESH_TOKEN": "rt",
+        },
+    )
     def test_refresh_tiktok_token_from_env(self, mock_post):
         mock_post.return_value.json.return_value = {
-            "access_token": "acc", "refresh_token": "ref", "expires_in": 3600
+            "access_token": "acc",
+            "refresh_token": "ref",
+            "expires_in": 3600,
         }
         from proxycache.services.tiktok_feed import refreshTiktokToken
+
         access, refresh, expires = refreshTiktokToken()
         self.assertEqual(access, "acc")
         self.assertEqual(refresh, "ref")
@@ -592,10 +610,13 @@ class TiktokHelperTest(TestCase):
     @patch.dict(os.environ, {"TIKTOK_CLIENT_KEY": "k", "TIKTOK_CLIENT_SECRET": "s"})
     def test_get_tiktok_token_creates_record_when_none_exists(self, mock_post):
         mock_post.return_value.json.return_value = {
-            "access_token": "new_acc", "refresh_token": "new_ref", "expires_in": 3600
+            "access_token": "new_acc",
+            "refresh_token": "new_ref",
+            "expires_in": 3600,
         }
         from proxycache.models import TiktokToken
         from proxycache.services.tiktok_feed import getTiktokToken
+
         TiktokToken.objects.all().delete()
         with patch.dict(os.environ, {"TIKTOK_REFRESH_TOKEN": "rt"}):
             token = getTiktokToken()
@@ -609,12 +630,17 @@ class TiktokHelperTest(TestCase):
         from django.utils.timezone import now
         from proxycache.models import TiktokToken
         from proxycache.services.tiktok_feed import getTiktokToken
+
         TiktokToken.objects.all().delete()
-        TiktokToken.objects.create(token="old_token", refresh_token="old_ref", expires_in=1)
+        TiktokToken.objects.create(
+            token="old_token", refresh_token="old_ref", expires_in=1
+        )
         # auto_now ignores date in create(); use update() to set it in the past
         TiktokToken.objects.update(date=now() - timedelta(seconds=60))
         mock_post.return_value.json.return_value = {
-            "access_token": "refreshed", "refresh_token": "new_ref", "expires_in": 3600
+            "access_token": "refreshed",
+            "refresh_token": "new_ref",
+            "expires_in": 3600,
         }
         token = getTiktokToken()
         self.assertEqual(token, "refreshed")
@@ -628,9 +654,15 @@ class BlueskyFeedAccountTest(TestCase):
     def test_default_account_uses_vvp_env(self, mock_client_cls):
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
-        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:vvp")
-        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
-        with patch.dict(os.environ, {"BSKY_HANDLE": "vvp.bsky.social", "BSKY_PWD": "vvp_pass"}):  # nosec
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(
+            did="did:vvp"
+        )
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(
+            feed=[], cursor=None
+        )
+        with patch.dict(
+            os.environ, {"BSKY_HANDLE": "vvp.bsky.social", "BSKY_PWD": "vvp_pass"}
+        ):  # nosec
             response = self.client.get("/proxy/blueskyFeed")
         self.assertEqual(response.status_code, 200)
         mock_client.login.assert_called_once_with("vvp.bsky.social", "vvp_pass")
@@ -639,10 +671,22 @@ class BlueskyFeedAccountTest(TestCase):
     def test_pruefpunkt_account_uses_pruefpunkt_env(self, mock_client_cls):
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
-        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:pp")
-        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
-        with patch.dict(os.environ, {"BSKY_HANDLE_PRUEFPUNKT": "pp.bsky.social", "BSKY_PWD_PRUEFPUNKT": "pp_pass"}):  # nosec
-            response = self.client.get("/proxy/blueskyFeed?account=pruefpunkt&cachebust=pp")
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(
+            did="did:pp"
+        )
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(
+            feed=[], cursor=None
+        )
+        with patch.dict(
+            os.environ,
+            {
+                "BSKY_HANDLE_PRUEFPUNKT": "pp.bsky.social",
+                "BSKY_PWD_PRUEFPUNKT": "pp_pass",
+            },
+        ):  # nosec
+            response = self.client.get(
+                "/proxy/blueskyFeed?account=pruefpunkt&cachebust=pp"
+            )
         self.assertEqual(response.status_code, 200)
         mock_client.login.assert_called_once_with("pp.bsky.social", "pp_pass")
 
@@ -650,9 +694,16 @@ class BlueskyFeedAccountTest(TestCase):
     def test_bot_account_uses_bot_env(self, mock_client_cls):
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
-        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(did="did:bot")
-        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(feed=[], cursor=None)
-        with patch.dict(os.environ, {"BSKY_BOT_HANDLE": "bot.bsky.social", "BSKY_BOT_PWD": "bot_pass"}):  # nosec
+        mock_client.com.atproto.identity.resolve_handle.return_value = MagicMock(
+            did="did:bot"
+        )
+        mock_client.app.bsky.feed.get_author_feed.return_value = MagicMock(
+            feed=[], cursor=None
+        )
+        with patch.dict(
+            os.environ,
+            {"BSKY_BOT_HANDLE": "bot.bsky.social", "BSKY_BOT_PWD": "bot_pass"},
+        ):  # nosec
             response = self.client.get("/proxy/blueskyFeed?account=bot&cachebust=bot")
         self.assertEqual(response.status_code, 200)
         mock_client.login.assert_called_once_with("bot.bsky.social", "bot_pass")

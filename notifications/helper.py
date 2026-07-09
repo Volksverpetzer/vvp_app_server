@@ -70,7 +70,8 @@ def send_push_message(
     except PushServerError as exc:
         # Encountered some likely formatting/validation error.
         logger.error(
-            "PushServerError for tokens=%s, message=%s, extra=%s, errors=%s, response_data=%s",
+            "PushServerError for tokens=%s, message=%s, extra=%s, "
+            "errors=%s, response_data=%s",
             [d.expo_token for d in devices_to_notify],
             title,
             extra,

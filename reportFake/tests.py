@@ -18,7 +18,10 @@ class Notification(TestCase):
         self.c = Client(enforce_csrf_checks=True)
 
     @override_settings(RATELIMIT_ENABLE=False)
-    def test_send_report(self):
+    @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
+    @patch("contact.asana.requests.post")
+    def test_send_report(self, mock_post: MagicMock):
+        mock_post.return_value = MagicMock(status_code=201, text="")
         response = self.c.post(
             "/reportFake",
             {
@@ -29,7 +32,13 @@ class Notification(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(FakeReport.objects.filter(url="https://welt.de").exists(), True)
+        self.assertTrue(json.loads(response.content)["success"])
+        self.assertEqual(
+            FakeReport.objects.filter(url="https://welt.de").exists(), True
+        )
+        # The legacy endpoint posts to the same Asana board as the contact app
+        payload = mock_post.call_args.kwargs["json"]["data"]
+        self.assertEqual(payload["name"], "Fake-Report | https://welt.de")
 
     @override_settings(RATELIMIT_ENABLE=False)
     def test_send_report_invalid_url_scheme(self):
@@ -75,7 +84,7 @@ class Notification(TestCase):
 
     @override_settings(RATELIMIT_ENABLE=False)
     @patch.dict(os.environ, {}, clear=True)
-    def test_send_report_missing_mailgun_env_returns_failure(self):
+    def test_send_report_missing_asana_env_returns_failure(self):
         response = self.c.post(
             "/reportFake",
             {"description": "d", "url": "https://example.com", "more_info": "m"},
@@ -85,22 +94,47 @@ class Notification(TestCase):
         self.assertFalse(json.loads(response.content)["success"])
 
     @override_settings(RATELIMIT_ENABLE=False)
-    @patch.dict(os.environ, {"MAILGUN_TOKEN": "t", "MAILGUN_DOMAIN": "d.com", "MAILGUN_RECEIVER": "r@r.com"})
-    @patch("reportFake.views.requests.post")
-    def test_send_report_mailgun_non_200_returns_failure(self, mock_post):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 500
-        mock_post.return_value = mock_resp
+    @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
+    @patch("contact.asana.requests.post")
+    def test_send_report_asana_error_returns_failure(self, mock_post: MagicMock):
+        mock_post.return_value = MagicMock(status_code=500, text="")
         response = self.c.post(
             "/reportFake",
-            {"description": "d", "url": "https://example.com/unique1", "more_info": "m"},
+            {
+                "description": "d",
+                "url": "https://example.com/unique1",
+                "more_info": "m",
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(json.loads(response.content)["success"])
+        # The row is kept unposted so a retry reattempts the Asana post
+        report = FakeReport.objects.get(url="https://example.com/unique1")
+        self.assertFalse(report.posted_to_asana)
 
     @override_settings(RATELIMIT_ENABLE=False)
-    def test_send_report_uppercase_scheme_accepted(self):
+    @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
+    @patch("contact.asana.requests.post")
+    def test_send_report_retry_after_asana_failure(self, mock_post: MagicMock):
+        body = {
+            "description": "d",
+            "url": "https://example.com/retry",
+            "more_info": "m",
+        }
+        mock_post.return_value = MagicMock(status_code=500, text="")
+        response = self.c.post("/reportFake", body, content_type="application/json")
+        self.assertFalse(json.loads(response.content)["success"])
+        mock_post.return_value = MagicMock(status_code=201, text="")
+        response = self.c.post("/reportFake", body, content_type="application/json")
+        self.assertTrue(json.loads(response.content)["success"])
+        self.assertEqual(mock_post.call_count, 2)
+
+    @override_settings(RATELIMIT_ENABLE=False)
+    @patch.dict(os.environ, {"ASANA_TOKEN": "t", "ASANA_PROJECT_GID": "1"})
+    @patch("contact.asana.requests.post")
+    def test_send_report_uppercase_scheme_accepted(self, mock_post: MagicMock):
+        mock_post.return_value = MagicMock(status_code=201, text="")
         response = self.c.post(
             "/reportFake",
             {"description": "d", "url": "HTTPS://welt.de", "more_info": "m"},
@@ -112,9 +146,9 @@ class Notification(TestCase):
 
 class ReportFakeViewsTest(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="test", password="dummy_password") # nosec
+        self.user = User.objects.create_user(username="test", password="dummy_password")  # nosec
         self.client = Client()
-        self.client.login(username="test", password="dummy_password") # nosec
+        self.client.login(username="test", password="dummy_password")  # nosec
 
     def test_triageFake_shows_reports(self):
         FakeReport.objects.create(description="d", url="u", more_info="m")
@@ -124,7 +158,10 @@ class ReportFakeViewsTest(TestCase):
 
     def test_triageFake_javascript_url_rendered_as_text_not_link(self):
         FakeReport.objects.create(
-            description="xss", url="javascript:alert(1)", more_info="m", allowed_public=True
+            description="xss",
+            url="javascript:alert(1)",
+            more_info="m",
+            allowed_public=True,
         )
         response = self.client.get("/triageFake")
         self.assertEqual(response.status_code, 200)
@@ -134,7 +171,10 @@ class ReportFakeViewsTest(TestCase):
 
     def test_assign_bluesky_rejects_invalid_scheme(self):
         report = FakeReport.objects.create(
-            description="d", url="https://example.com", more_info="m", allowed_public=True
+            description="d",
+            url="https://example.com",
+            more_info="m",
+            allowed_public=True,
         )
         response = self.client.post(
             "/assign-bluesky",
@@ -169,7 +209,10 @@ class ReportFakeViewsTest(TestCase):
 
     def test_archiveFake_post_archives_report(self):
         report = FakeReport.objects.create(
-            description="d", url="https://example.com", more_info="m", allowed_public=True
+            description="d",
+            url="https://example.com",
+            more_info="m",
+            allowed_public=True,
         )
         response = self.client.post("/archiveFake", {"report_id": str(report.id)})
         self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
@@ -181,7 +224,9 @@ class ReportFakeViewsTest(TestCase):
         self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
 
     def test_statusFake_pending(self):
-        report = FakeReport.objects.create(description="d", url="https://example.com", more_info="m")
+        report = FakeReport.objects.create(
+            description="d", url="https://example.com", more_info="m"
+        )
         response = self.client.get(f"/statusFake/{report.id}")
         self.assertEqual(response.json()["status"], "pending")
         self.assertIsNone(response.json()["url"])
@@ -191,22 +236,30 @@ class ReportFakeViewsTest(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_assign_bluesky_missing_fields_redirects(self):
-        response = self.client.post("/assign-bluesky", {"report_id": "", "bluesky_url": ""})
+        response = self.client.post(
+            "/assign-bluesky", {"report_id": "", "bluesky_url": ""}
+        )
         self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
 
     def test_assign_bluesky_valid_post_redirects(self):
         report = FakeReport.objects.create(
-            description="d", url="https://example.com", more_info="m", allowed_public=True
+            description="d",
+            url="https://example.com",
+            more_info="m",
+            allowed_public=True,
         )
         response = self.client.post(
             "/assign-bluesky",
-            {"report_id": str(report.id), "bluesky_url": "https://bsky.app/profile/test/post/1"},
+            {
+                "report_id": str(report.id),
+                "bluesky_url": "https://bsky.app/profile/test/post/1",
+            },
         )
         self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
 
     def test_ratelimit_view_returns_429(self):
         from reportFake.views import ratelimit_view
+
         request = RequestFactory().get("/")
         response = ratelimit_view(request, Exception("rate limited"))
         self.assertEqual(response.status_code, 429)
-

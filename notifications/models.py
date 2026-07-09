@@ -10,6 +10,9 @@ class NotificationDevice(models.Model):
     notification_new_pruefpunkt = models.BooleanField(default=False)
     date = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self) -> str:
+        return self.expo_token
+
 
 class PushMessageLog(models.Model):
     to = models.ForeignKey(NotificationDevice, on_delete=models.CASCADE)
@@ -19,3 +22,6 @@ class PushMessageLog(models.Model):
     date = models.DateTimeField(auto_now_add=True)
     id = models.CharField(max_length=256, primary_key=True)
     checked = models.BooleanField(default=False)
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.id})"
