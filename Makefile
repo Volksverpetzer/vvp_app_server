@@ -1,4 +1,4 @@
 .PHONY: allowlist
 
 allowlist:
-	@sh scripts/run_add_ip.sh
+	@sh scripts/add_ip_to_scaleway_allowlist.sh

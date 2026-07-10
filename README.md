@@ -102,7 +102,7 @@ python manage.py createcachetable
 
 # 5. Start the development server
 python manage.py runserver
-# or use the helper script: ./dev_startup.sh
+# or use the helper script: ./scripts/dev_startup.sh
 ```
 
 ### Background Worker
