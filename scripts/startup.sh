@@ -30,7 +30,13 @@ trap shutdown TERM INT
 
 # Block on Gunicorn. A trapped SIGTERM/SIGINT interrupts this wait and runs
 # shutdown(); if Gunicorn exits on its own we fall through and tear down the
-# worker too. Either way both processes stop before the container exits.
-wait "$gunicorn_pid" || true
+# worker too. Capture its status (|| guard keeps `set -e` from bailing before
+# teardown) so a crash still propagates and the container can restart.
+gunicorn_status=0
+wait "$gunicorn_pid" || gunicorn_status=$?
 shutdown
-wait "$qcluster_pid" 2>/dev/null || true
+# Wait for BOTH children to fully exit before PID 1 does — Gunicorn may still
+# be draining connections (up to --timeout). Exiting here would let Docker
+# force-kill it mid-shutdown.
+wait
+exit "$gunicorn_status"
