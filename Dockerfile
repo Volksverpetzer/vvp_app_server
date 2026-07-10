@@ -38,4 +38,4 @@ RUN python manage.py collectstatic --noinput
 EXPOSE 8080
 
 # Set the container startup command
-CMD ["sh", "-c", "set -e; python manage.py migrate; python manage.py createcachetable cache_table; python manage.py qcluster & exec gunicorn --bind 0.0.0.0:8080 --timeout 600 vvp_app_server.wsgi --access-logfile '-' --error-logfile '-'"]
+CMD ["sh", "scripts/startup.sh"]

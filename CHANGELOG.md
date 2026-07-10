@@ -1,3 +1,21 @@
+# [1.3.2](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.1...v1.3.2) (2026-07-10)
+
+
+### Bug Fixes
+
+* **Startup** — stop the Django-Q worker gracefully on shutdown. The container startup no longer `exec`s Gunicorn as PID 1 (which left the `qcluster` worker to be force-killed); it now runs both as child processes, forwards `SIGTERM`/`SIGINT` to each, and waits for Gunicorn to finish draining before exiting ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
+
+
+### Features
+
+* **Rate limiting** — add a `RATELIMIT_ENABLE` env toggle to disable API rate limits for local development/testing; defaults to enabled. Parsing is strict: only explicit true/false values are accepted and anything else raises at startup, so a typo can never silently disable rate limiting ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
+
+
+### Chores
+
+* **Scripts** — consolidate shell scripts under `scripts/` (merge the `run_add_ip.sh` wrapper into `add_ip_to_scaleway_allowlist.sh`, move `startup.sh`/`dev_startup.sh`), make them runnable from any directory, and have the Docker `CMD` call `scripts/startup.sh`; update the Makefile, README, and `.env.sample` accordingly ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
+
+
 # [1.3.1](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.0...v1.3.1) (2026-07-09)
 
 
