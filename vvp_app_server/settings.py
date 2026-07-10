@@ -243,7 +243,13 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django-ratelimit settings
-RATELIMIT_ENABLE = env("RATELIMIT_ENABLE", default="true") == "true"
+# Handle common truthy values (case-insensitive): true, 1, yes, on
+RATELIMIT_ENABLE = env("RATELIMIT_ENABLE", default="true").lower() in (
+    "true",
+    "1",
+    "yes",
+    "on",
+)
 RATELIMIT_VIEW = "reportFake.views.ratelimit_view"
 # Use the shared DatabaseCache so rate-limit counters are consistent across
 # all Gunicorn workers and processes (LocMemCache is per-process only).
