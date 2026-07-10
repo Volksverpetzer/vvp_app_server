@@ -8,7 +8,7 @@
 
 ### Features
 
-* **Rate limiting** — add a `RATELIMIT_ENABLE` env toggle (parsed with `env.bool`, so invalid values fail fast) to disable API rate limits for local development/testing; defaults to enabled ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
+* **Rate limiting** — add a `RATELIMIT_ENABLE` env toggle to disable API rate limits for local development/testing; defaults to enabled. Parsing is strict: only explicit true/false values are accepted and anything else raises at startup, so a typo can never silently disable rate limiting ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
 
 
 ### Chores

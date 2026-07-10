@@ -243,10 +243,21 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django-ratelimit settings
-# env.bool handles true/false/1/0/yes/no/on/off (case-insensitive) and
-# raises on invalid values, so a typo fails fast instead of silently
-# disabling rate limiting.
-RATELIMIT_ENABLE = env.bool("RATELIMIT_ENABLE", default=True)
+# Strict boolean parsing: env.bool() silently maps any unrecognized string
+# (e.g. "enabled", typos) to False, which would turn off rate limiting.
+# Only an explicit false-y value may disable it; anything else raises.
+_ratelimit_enable = env("RATELIMIT_ENABLE", default="true").strip().lower()
+if _ratelimit_enable in ("true", "1", "yes", "on"):
+    RATELIMIT_ENABLE = True
+elif _ratelimit_enable in ("false", "0", "no", "off"):
+    RATELIMIT_ENABLE = False
+else:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        f"RATELIMIT_ENABLE has unrecognized value {_ratelimit_enable!r}; "
+        "use true/false/1/0/yes/no/on/off"
+    )
 RATELIMIT_VIEW = "reportFake.views.ratelimit_view"
 # Use the shared DatabaseCache so rate-limit counters are consistent across
 # all Gunicorn workers and processes (LocMemCache is per-process only).
