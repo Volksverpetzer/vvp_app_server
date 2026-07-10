@@ -1,4 +1,9 @@
+#!/bin/sh
 set -e
+
+# Change to project root directory
+cd "$(dirname "$0")/.."
+
 python manage.py migrate
 python manage.py createcachetable cache_table
 python manage.py qcluster &
