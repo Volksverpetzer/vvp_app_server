@@ -38,5 +38,9 @@ shutdown
 # Wait for BOTH children to fully exit before PID 1 does — Gunicorn may still
 # be draining connections (up to --timeout). Exiting here would let Docker
 # force-kill it mid-shutdown.
+# Note: a bare `wait` (no operands) always returns 0 per POSIX, regardless of
+# the children's exit statuses, so it cannot trip `set -e`. Do not refactor
+# this to `wait "$pid"` — an operand form returns that child's status and
+# WOULD abort under `set -e` before the exit line below.
 wait
 exit "$gunicorn_status"
