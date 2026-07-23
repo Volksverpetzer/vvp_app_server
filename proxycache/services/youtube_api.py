@@ -6,6 +6,10 @@ from googleapiclient.discovery import build  # type: ignore[reportMissingTypeStu
 
 from vvp_app_server.cache_utils import cache_response
 
+# Volksverpetzer YouTube channel; overridable via the YT_CHANNEL_ID env var
+# (e.g. for the Mimikama deployment).
+DEFAULT_CHANNEL_ID = "UC9qdoYTVU413M6EvqDRZDtA"
+
 
 @cache_response(lambda request, *args, **kwargs: request.get_full_path(), 60 * 30)
 def ytAPI(request: HttpRequest):
@@ -14,7 +18,7 @@ def ytAPI(request: HttpRequest):
     Returns:
        JsonResponse: Youtube Feed
     """
-    channel_id = "UC9qdoYTVU413M6EvqDRZDtA"
+    channel_id = os.environ.get("YT_CHANNEL_ID") or DEFAULT_CHANNEL_ID
     youtube = build("youtube", "v3", developerKey=os.environ["YT_ACCESS_TOKEN"])
     yt_request = youtube.search().list(
         part="snippet",

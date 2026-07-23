@@ -337,6 +337,33 @@ class ProxyTest(TestCase):
                 response2 = self.c.get("/proxy/ytAPI")
                 self.assertEqual(data, response2.json())
 
+    def test_youtube_channel_id_defaults_and_env_override(self):
+        def run(env):
+            with patch.dict(os.environ, env):  # nosec
+                with patch("proxycache.services.youtube_api.build") as mock_build:
+                    mock_youtube = MagicMock()
+                    mock_build.return_value = mock_youtube
+                    mock_youtube.search.return_value.list.return_value.execute.return_value = {  # noqa: E501
+                        "items": []
+                    }
+                    # Unique query string keeps each call off the shared cache.
+                    bust = env.get("YT_CHANNEL_ID", "default")
+                    self.c.get(f"/proxy/ytAPI?cachebust={bust}")
+                    return mock_youtube.search.return_value.list.call_args[1][
+                        "channelId"
+                    ]
+
+        # Default channel when unset
+        os.environ.pop("YT_CHANNEL_ID", None)
+        self.assertEqual(
+            run({"YT_ACCESS_TOKEN": "dummy"}), "UC9qdoYTVU413M6EvqDRZDtA"  # nosec
+        )
+        # Env override wins
+        self.assertEqual(
+            run({"YT_ACCESS_TOKEN": "dummy", "YT_CHANNEL_ID": "UC_custom"}),  # nosec
+            "UC_custom",
+        )
+
 
 class AnalyticsSiteTests(TestCase):
     def setUp(self):
