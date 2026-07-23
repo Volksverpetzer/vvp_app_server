@@ -64,16 +64,29 @@ if not DEBUG:
     if not SECURE_SSL_REDIRECT:
         raise ImproperlyConfigured("SECURE_SSL_REDIRECT must be True in production")
 
+# Keep this list tight: every allowed host is a potential Host-header
+# cache-poisoning vector, because replace_media_urls() builds absolute URLs
+# from the request host and those land in the shared response cache.
+# "pruefpunkt.org" was removed — it is the WordPress site's domain and never
+# legitimately reaches this server as a Host header (the site-scoped analytics
+# select the site via the ?site= query parameter, not the vhost).
 ALLOWED_HOSTS = [
     "mimikamaserver.azurewebsites.net",
-    "pruefpunkt.org",
     "staging.volksverpetzer-app.de",
     "volksverpetzer-app.de",
-    "127.0.0.1",
-    "localhost",
+    # Azure entries for the Mimikama App Service deployment:
+    # 169.254.131.2 is the App Service link-local container health-ping
+    # address and must stay while anything runs on Azure.
+    # TODO: verify against the Azure probe config whether the raw inbound IP
+    # is actually used as a Host header; if probes use the hostname, drop it.
     "20.105.232.42",
     "169.254.131.2",
 ]
+
+if DEBUG:
+    # Development-only hosts; 10.0.2.2 is the Android emulator's alias for
+    # the host machine's loopback.
+    ALLOWED_HOSTS += ["127.0.0.1", "localhost", "10.0.2.2"]
 
 
 # Application definition
