@@ -14,8 +14,12 @@ DEFAULT_FEED_URL = "https://volksverpetzer.podigee.io/feed/mp3"
 
 def get_feed_url() -> str:
     """The podcast RSS feed URL, overridable via the PODCAST_FEED_URL env var
-    (e.g. for the Mimikama deployment or a feed move)."""
-    return os.environ.get("PODCAST_FEED_URL") or DEFAULT_FEED_URL
+    (e.g. for the Mimikama deployment or a feed move).
+
+    .strip() so a stray-whitespace env value falls back to the default rather
+    than being fetched as a malformed URL.
+    """
+    return os.environ.get("PODCAST_FEED_URL", "").strip() or DEFAULT_FEED_URL
 
 ITUNES_NS = "{http://www.itunes.com/dtds/podcast-1.0.dtd}"
 

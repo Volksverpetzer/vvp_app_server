@@ -18,7 +18,9 @@ def ytAPI(request: HttpRequest):
     Returns:
        JsonResponse: Youtube Feed
     """
-    channel_id = os.environ.get("YT_CHANNEL_ID") or DEFAULT_CHANNEL_ID
+    # .strip() so a stray-whitespace env value falls back to the default
+    # instead of being sent to the API as a malformed channel id (→ 500).
+    channel_id = os.environ.get("YT_CHANNEL_ID", "").strip() or DEFAULT_CHANNEL_ID
     youtube = build("youtube", "v3", developerKey=os.environ["YT_ACCESS_TOKEN"])
     yt_request = youtube.search().list(
         part="snippet",
