@@ -337,6 +337,44 @@ class ProxyTest(TestCase):
                 response2 = self.c.get("/proxy/ytAPI")
                 self.assertEqual(data, response2.json())
 
+    def test_youtube_channel_id_defaults_and_env_override(self):
+        def run(env, bust, unset_channel=False):
+            # patch.dict snapshots os.environ and restores it on exit, so both
+            # the injected keys and the pop below are undone afterwards — no
+            # cross-test pollution even if the real env sets YT_CHANNEL_ID.
+            with patch.dict(os.environ, env):  # nosec
+                if unset_channel:
+                    os.environ.pop("YT_CHANNEL_ID", None)
+                with patch("proxycache.services.youtube_api.build") as mock_build:
+                    mock_youtube = MagicMock()
+                    mock_build.return_value = mock_youtube
+                    mock_youtube.search.return_value.list.return_value.execute.return_value = {  # noqa: E501
+                        "items": []
+                    }
+                    # Unique query string keeps each call off the shared cache.
+                    self.c.get(f"/proxy/ytAPI?cachebust={bust}")
+                    return mock_youtube.search.return_value.list.call_args[1][
+                        "channelId"
+                    ]
+
+        default_channel = "UC9qdoYTVU413M6EvqDRZDtA"
+        # Default channel when unset
+        self.assertEqual(
+            run({"YT_ACCESS_TOKEN": "dummy"}, "default", unset_channel=True),  # nosec
+            default_channel,
+        )
+        # Env override wins
+        self.assertEqual(
+            run({"YT_ACCESS_TOKEN": "dummy", "YT_CHANNEL_ID": "UC_custom"}, "custom"),  # nosec
+            "UC_custom",
+        )
+        # Whitespace-only value falls back to the default instead of being sent
+        # to the API as a malformed channel id
+        self.assertEqual(
+            run({"YT_ACCESS_TOKEN": "dummy", "YT_CHANNEL_ID": "   "}, "ws"),  # nosec
+            default_channel,
+        )
+
 
 class AnalyticsSiteTests(TestCase):
     def setUp(self):
@@ -822,6 +860,14 @@ class PodcastFeedTest(TestCase):
             response = self.c.get("/proxy/podcastFeed")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_get.call_args[0][0], "https://example.com/other-feed")
+
+    def test_get_feed_url_whitespace_falls_back_to_default(self):
+        from proxycache.services.podcast_feed import DEFAULT_FEED_URL, get_feed_url
+
+        with patch.dict(os.environ, {"PODCAST_FEED_URL": "   "}):
+            self.assertEqual(get_feed_url(), DEFAULT_FEED_URL)
+        with patch.dict(os.environ, {"PODCAST_FEED_URL": ""}):
+            self.assertEqual(get_feed_url(), DEFAULT_FEED_URL)
 
     @patch("proxycache.services.podcast_feed.requests.get")
     def test_podcast_feed_is_cached_and_ignores_query_strings(self, mock_get):
