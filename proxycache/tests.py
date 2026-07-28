@@ -317,8 +317,15 @@ class ProxyTest(TestCase):
                 mock_videos = mock_youtube.videos.return_value
                 mock_videos.list.return_value.execute.return_value = {
                     "items": [
-                        {"snippet": {"description": "desc"}},
-                        {"snippet": {"description": "#shorts hide"}},
+                        {
+                            "snippet": {"description": "desc"},
+                            "contentDetails": {"duration": "PT5M12S"},
+                        },
+                        {
+                            "snippet": {"description": "regular-length short-tagged"},
+                            "contentDetails": {"duration": "PT45S"},
+                        },
+                        {"snippet": {"description": "no duration"}},
                         {},
                     ]
                 }
