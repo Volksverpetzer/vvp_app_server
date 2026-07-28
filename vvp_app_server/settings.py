@@ -74,6 +74,11 @@ ALLOWED_HOSTS = [
     "mimikamaserver.azurewebsites.net",
     "staging.volksverpetzer-app.de",
     "volksverpetzer-app.de",
+    # Kept unconditionally (not just in DEBUG): a production health/liveness
+    # probe hitting the container over loopback would otherwise get a 400
+    # DisallowedHost instead of a real health response.
+    "127.0.0.1",
+    "localhost",
     # Azure entries for the Mimikama App Service deployment:
     # 169.254.131.2 is the App Service link-local container health-ping
     # address and must stay while anything runs on Azure.
@@ -84,9 +89,9 @@ ALLOWED_HOSTS = [
 ]
 
 if DEBUG:
-    # Development-only hosts; 10.0.2.2 is the Android emulator's alias for
+    # Development-only host: 10.0.2.2 is the Android emulator's alias for
     # the host machine's loopback.
-    ALLOWED_HOSTS += ["127.0.0.1", "localhost", "10.0.2.2"]
+    ALLOWED_HOSTS += ["10.0.2.2"]
 
 
 # Application definition
