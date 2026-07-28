@@ -64,16 +64,34 @@ if not DEBUG:
     if not SECURE_SSL_REDIRECT:
         raise ImproperlyConfigured("SECURE_SSL_REDIRECT must be True in production")
 
+# Keep this list tight: every allowed host is a potential Host-header
+# cache-poisoning vector, because replace_media_urls() builds absolute URLs
+# from the request host and those land in the shared response cache.
+# "pruefpunkt.org" was removed — it is the WordPress site's domain and never
+# legitimately reaches this server as a Host header (the site-scoped analytics
+# select the site via the ?site= query parameter, not the vhost).
 ALLOWED_HOSTS = [
     "mimikamaserver.azurewebsites.net",
-    "pruefpunkt.org",
     "staging.volksverpetzer-app.de",
     "volksverpetzer-app.de",
+    # Kept unconditionally (not just in DEBUG): a production health/liveness
+    # probe hitting the container over loopback would otherwise get a 400
+    # DisallowedHost instead of a real health response.
     "127.0.0.1",
     "localhost",
+    # Azure entries for the Mimikama App Service deployment:
+    # 169.254.131.2 is the App Service link-local container health-ping
+    # address and must stay while anything runs on Azure.
+    # TODO: verify against the Azure probe config whether the raw inbound IP
+    # is actually used as a Host header; if probes use the hostname, drop it.
     "20.105.232.42",
     "169.254.131.2",
 ]
+
+if DEBUG:
+    # Development-only host: 10.0.2.2 is the Android emulator's alias for
+    # the host machine's loopback.
+    ALLOWED_HOSTS += ["10.0.2.2"]
 
 
 # Application definition
@@ -243,6 +261,21 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Django-ratelimit settings
+# Strict boolean parsing: env.bool() silently maps any unrecognized string
+# (e.g. "enabled", typos) to False, which would turn off rate limiting.
+# Only an explicit false-y value may disable it; anything else raises.
+_ratelimit_enable = env("RATELIMIT_ENABLE", default="true").strip().lower()
+if _ratelimit_enable in ("true", "1", "yes", "on"):
+    RATELIMIT_ENABLE = True
+elif _ratelimit_enable in ("false", "0", "no", "off"):
+    RATELIMIT_ENABLE = False
+else:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        f"RATELIMIT_ENABLE has unrecognized value {_ratelimit_enable!r}; "
+        "use true/false/1/0/yes/no/on/off"
+    )
 RATELIMIT_VIEW = "reportFake.views.ratelimit_view"
 # Use the shared DatabaseCache so rate-limit counters are consistent across
 # all Gunicorn workers and processes (LocMemCache is per-process only).

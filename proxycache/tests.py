@@ -2,6 +2,8 @@ import os
 import urllib.parse
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
@@ -315,8 +317,15 @@ class ProxyTest(TestCase):
                 mock_videos = mock_youtube.videos.return_value
                 mock_videos.list.return_value.execute.return_value = {
                     "items": [
-                        {"snippet": {"description": "desc"}},
-                        {"snippet": {"description": "#shorts hide"}},
+                        {
+                            "snippet": {"description": "desc"},
+                            "contentDetails": {"duration": "PT5M12S"},
+                        },
+                        {
+                            "snippet": {"description": "regular-length short-tagged"},
+                            "contentDetails": {"duration": "PT45S"},
+                        },
+                        {"snippet": {"description": "no duration"}},
                         {},
                     ]
                 }
@@ -334,6 +343,44 @@ class ProxyTest(TestCase):
                 # cached response same
                 response2 = self.c.get("/proxy/ytAPI")
                 self.assertEqual(data, response2.json())
+
+    def test_youtube_channel_id_defaults_and_env_override(self):
+        def run(env, bust, unset_channel=False):
+            # patch.dict snapshots os.environ and restores it on exit, so both
+            # the injected keys and the pop below are undone afterwards — no
+            # cross-test pollution even if the real env sets YT_CHANNEL_ID.
+            with patch.dict(os.environ, env):  # nosec
+                if unset_channel:
+                    os.environ.pop("YT_CHANNEL_ID", None)
+                with patch("proxycache.services.youtube_api.build") as mock_build:
+                    mock_youtube = MagicMock()
+                    mock_build.return_value = mock_youtube
+                    mock_youtube.search.return_value.list.return_value.execute.return_value = {  # noqa: E501
+                        "items": []
+                    }
+                    # Unique query string keeps each call off the shared cache.
+                    self.c.get(f"/proxy/ytAPI?cachebust={bust}")
+                    return mock_youtube.search.return_value.list.call_args[1][
+                        "channelId"
+                    ]
+
+        default_channel = "UC9qdoYTVU413M6EvqDRZDtA"
+        # Default channel when unset
+        self.assertEqual(
+            run({"YT_ACCESS_TOKEN": "dummy"}, "default", unset_channel=True),  # nosec
+            default_channel,
+        )
+        # Env override wins
+        self.assertEqual(
+            run({"YT_ACCESS_TOKEN": "dummy", "YT_CHANNEL_ID": "UC_custom"}, "custom"),  # nosec
+            "UC_custom",
+        )
+        # Whitespace-only value falls back to the default instead of being sent
+        # to the API as a malformed channel id
+        self.assertEqual(
+            run({"YT_ACCESS_TOKEN": "dummy", "YT_CHANNEL_ID": "   "}, "ws"),  # nosec
+            default_channel,
+        )
 
 
 class AnalyticsSiteTests(TestCase):
@@ -711,3 +758,154 @@ class BlueskyFeedAccountTest(TestCase):
     def test_invalid_account_returns_400(self):
         response = self.client.get("/proxy/blueskyFeed?account=unknown&cachebust=inv")
         self.assertEqual(response.status_code, 400)
+
+
+PODCAST_FEED_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
+  <channel>
+    <title>Volksverpetzer - der Podcast</title>
+    <image>
+      <url>https://example.com/channel.png</url>
+    </image>
+    <item>
+      <title>Folge 24: Testfolge</title>
+      <description>Beschreibung der Folge.
+</description>
+      <pubDate>Fri, 26 Jun 2026 04:00:00 +0000</pubDate>
+      <link>https://volksverpetzer.podigee.io/25-folge-24</link>
+      <guid isPermaLink="false">abc123</guid>
+      <itunes:image href="https://example.com/episode.png"/>
+      <enclosure url="https://audio.example.com/ep24.mp3" type="audio/mpeg" length="1"/>
+      <itunes:duration>3539</itunes:duration>
+    </item>
+    <item>
+      <title>Folge ohne Audio</title>
+      <guid>no-audio</guid>
+    </item>
+    <item>
+      <title>Folge mit HH:MM:SS Dauer</title>
+      <guid>hms</guid>
+      <enclosure url="https://audio.example.com/ep23.mp3" type="audio/mpeg" length="1"/>
+      <itunes:duration>01:02:03</itunes:duration>
+    </item>
+  </channel>
+</rss>
+"""
+
+
+class PodcastFeedTest(TestCase):
+    c = Client(enforce_csrf_checks=True)
+
+    def setUp(self):
+        # The endpoint uses a constant cache key, so cached responses would
+        # leak between tests without an explicit clear.
+        from django.core.cache import cache
+
+        cache.clear()
+
+    def test_parse_podcast_feed(self):
+        from proxycache.services.podcast_feed import parse_podcast_feed
+
+        episodes = parse_podcast_feed(PODCAST_FEED_XML)
+        # Episode without an enclosure is dropped
+        self.assertEqual(len(episodes), 2)
+        first = episodes[0]
+        self.assertEqual(first["id"], "abc123")
+        self.assertEqual(first["title"], "Folge 24: Testfolge")
+        self.assertEqual(first["description"], "Beschreibung der Folge.")
+        self.assertEqual(first["published_at"], "2026-06-26T04:00:00+00:00")
+        self.assertEqual(first["link"], "https://volksverpetzer.podigee.io/25-folge-24")
+        self.assertEqual(first["audio_url"], "https://audio.example.com/ep24.mp3")
+        self.assertEqual(first["image_url"], "https://example.com/episode.png")
+        self.assertEqual(first["duration"], 3539)
+        # HH:MM:SS duration and channel image fallback
+        second = episodes[1]
+        self.assertEqual(second["duration"], 3723)
+        self.assertEqual(second["image_url"], "https://example.com/channel.png")
+
+    def test_parse_naive_pubdate_is_treated_as_utc(self):
+        from proxycache.services.podcast_feed import parse_podcast_feed
+
+        # RFC 2822 "-0000" produces a naive datetime in parsedate_to_datetime;
+        # the parser must emit it with an explicit UTC offset so the app never
+        # interprets it as device-local time.
+        xml = PODCAST_FEED_XML.replace(b"+0000", b"-0000")
+        episodes = parse_podcast_feed(xml)
+        self.assertEqual(episodes[0]["published_at"], "2026-06-26T04:00:00+00:00")
+
+    def test_parse_duration_rejects_garbage(self):
+        from proxycache.services.podcast_feed import _parse_duration
+
+        self.assertEqual(_parse_duration("3539"), 3539)
+        self.assertEqual(_parse_duration("01:02:03"), 3723)
+        self.assertIsNone(_parse_duration("-5"))
+        self.assertIsNone(_parse_duration("1:2:3:4"))
+        self.assertIsNone(_parse_duration("abc"))
+        self.assertIsNone(_parse_duration(""))
+        self.assertIsNone(_parse_duration(None))
+
+    @patch("proxycache.services.podcast_feed.requests.get")
+    def test_podcast_feed_endpoint(self, mock_get):
+        mock_get.return_value.content = PODCAST_FEED_XML
+        response = self.c.get("/proxy/podcastFeed")
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(len(body["episodes"]), 2)
+        self.assertEqual(body["episodes"][0]["id"], "abc123")
+        mock_get.assert_called_once()
+        self.assertEqual(
+            mock_get.call_args[0][0], "https://volksverpetzer.podigee.io/feed/mp3"
+        )
+        self.assertIn("timeout", mock_get.call_args[1])
+
+    @patch("proxycache.services.podcast_feed.requests.get")
+    def test_podcast_feed_url_env_override(self, mock_get):
+        mock_get.return_value.content = PODCAST_FEED_XML
+        with patch.dict(
+            os.environ, {"PODCAST_FEED_URL": "https://example.com/other-feed"}
+        ):
+            response = self.c.get("/proxy/podcastFeed")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_get.call_args[0][0], "https://example.com/other-feed")
+
+    def test_get_feed_url_whitespace_falls_back_to_default(self):
+        from proxycache.services.podcast_feed import DEFAULT_FEED_URL, get_feed_url
+
+        with patch.dict(os.environ, {"PODCAST_FEED_URL": "   "}):
+            self.assertEqual(get_feed_url(), DEFAULT_FEED_URL)
+        with patch.dict(os.environ, {"PODCAST_FEED_URL": ""}):
+            self.assertEqual(get_feed_url(), DEFAULT_FEED_URL)
+
+    @patch("proxycache.services.podcast_feed.requests.get")
+    def test_podcast_feed_is_cached_and_ignores_query_strings(self, mock_get):
+        mock_get.return_value.content = PODCAST_FEED_XML
+        first = self.c.get("/proxy/podcastFeed")
+        second = self.c.get("/proxy/podcastFeed?bust=1")
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.json(), second.json())
+        # Constant cache key: a query string must not bypass the cache
+        mock_get.assert_called_once()
+
+    @patch("proxycache.services.podcast_feed.requests.get")
+    def test_podcast_feed_upstream_error_returns_502(self, mock_get):
+        mock_get.side_effect = requests.exceptions.ConnectionError("down")
+        response = self.c.get("/proxy/podcastFeed")
+        self.assertEqual(response.status_code, 502)
+
+    @patch("proxycache.services.podcast_feed.requests.get")
+    def test_podcast_feed_malformed_xml_returns_502(self, mock_get):
+        mock_get.return_value.content = b"<html>Podigee error page</html><oops"
+        response = self.c.get("/proxy/podcastFeed")
+        self.assertEqual(response.status_code, 502)
+
+    @patch("proxycache.services.podcast_feed.requests.get")
+    def test_podcast_feed_error_is_not_cached(self, mock_get):
+        mock_get.side_effect = requests.exceptions.ConnectionError("down")
+        self.assertEqual(self.c.get("/proxy/podcastFeed").status_code, 502)
+        # Upstream recovers: the next request must fetch fresh data instead of
+        # replaying the failure.
+        mock_get.side_effect = None
+        mock_get.return_value.content = PODCAST_FEED_XML
+        response = self.c.get("/proxy/podcastFeed")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["episodes"]), 2)

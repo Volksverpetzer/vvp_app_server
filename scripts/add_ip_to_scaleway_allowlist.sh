@@ -1,6 +1,26 @@
 #!/bin/sh
 set -eu
 
+# Load environment variables from .env file if not already set
+# .env is not a shell script: values may contain unquoted shell
+# metacharacters (e.g. & in SECRET_KEY), so sourcing it can fail with a
+# parse error. Extract only the variables we need, stripping optional
+# surrounding quotes. Variables already set in the environment win.
+env_var() {
+    env_file="$(cd "$(dirname "$0")/.." && pwd)/.env"
+    [ -f "$env_file" ] || return 0
+    val=$(grep "^$1=" "$env_file" | tail -n 1 | cut -d= -f2-)
+    case $val in
+        \"*\") val=${val#?}; val=${val%?} ;;
+        \'*\') val=${val#?}; val=${val%?} ;;
+    esac
+    printf '%s' "$val"
+}
+
+SCALEWAY_API_KEY=${SCALEWAY_API_KEY:-$(env_var SCALEWAY_API_KEY)}
+SCALEWAY_INSTANCE_ID=${SCALEWAY_INSTANCE_ID:-$(env_var SCALEWAY_INSTANCE_ID)}
+SCALEWAY_REGION=${SCALEWAY_REGION:-$(env_var SCALEWAY_REGION)}
+
 : "${SCALEWAY_INSTANCE_ID:?SCALEWAY_INSTANCE_ID is required}"
 : "${SCALEWAY_REGION:?SCALEWAY_REGION is required}"
 : "${SCALEWAY_API_KEY:?SCALEWAY_API_KEY is required}"

@@ -6,6 +6,7 @@ from .services.analytics import map as map_view
 from .services.analytics import regions, shares, stats
 from .services.bluesky_feed import blueskyFeed
 from .services.insta_feed import instaById, instaFeed
+from .services.podcast_feed import podcastFeed
 from .services.resolve_media_url import resolve_media_url
 from .services.tiktok_feed import tiktokFeed
 from .services.youtube_api import ytAPI
@@ -15,6 +16,7 @@ urlpatterns = [
     path("blueskyFeed", blueskyFeed, name="blueSkyFeed"),
     path("instaById/<str:id>", instaById, name="instaById"),
     path("ytAPI", ytAPI, name="ytAPI"),
+    path("podcastFeed", podcastFeed, name="podcastFeed"),
     path("shares", shares, name="shares_base"),
     path("links/<path:remaining>/", links, name="links"),
     path("map", map_view, name="map"),

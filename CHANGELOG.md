@@ -1,3 +1,26 @@
+# [1.4.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.1...v1.4.0) (2026-07-23)
+
+
+### Bug Fixes
+
+* **Startup** — stop the Django-Q worker gracefully on shutdown. The container startup no longer `exec`s Gunicorn as PID 1 (which left the `qcluster` worker to be force-killed); it now runs both as child processes, forwards `SIGTERM`/`SIGINT` to each, and waits for Gunicorn to finish draining before exiting ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
+* **ytAPI** — filter the YouTube feed to regular videos by actual duration (YouTube's own <=3min Shorts threshold) instead of the unreliable `"#shorts"` description-tag check, which let genuine Shorts through ([#31](https://github.com/Volksverpetzer/vvp_app_server/pull/31))
+
+
+### Features
+
+* **Podcast** — new `/proxy/podcastFeed` endpoint that fetches the podcast RSS feed (the Volksverpetzer Podigee feed by default, configurable via the `PODCAST_FEED_URL` env var) and serves parsed episodes as JSON for the app's new podcast home-feed section. Cached for 30 minutes under a constant cache key (query strings cannot bypass or evict the cache), returns a controlled `502` on upstream or parse failures, normalizes naive `pubDate` timezones to UTC, and validates `itunes:duration` values ([#27](https://github.com/Volksverpetzer/vvp_app_server/pull/27))
+* **Rate limiting** — add a `RATELIMIT_ENABLE` env toggle to disable API rate limits for local development/testing; defaults to enabled. Parsing is strict: only explicit true/false values are accepted and anything else raises at startup, so a typo can never silently disable rate limiting ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
+* **YouTube channel** — add a `YT_CHANNEL_ID` env var (mirrors `PODCAST_FEED_URL`) so the `ytAPI` endpoint's source channel is configurable per deployment (e.g. Mimikama) without a code change; both it and `PODCAST_FEED_URL` now fall back to the default instead of passing a whitespace-only value downstream ([#29](https://github.com/Volksverpetzer/vvp_app_server/pull/29))
+
+
+### Chores
+
+* **Scripts** — consolidate shell scripts under `scripts/` (merge the `run_add_ip.sh` wrapper into `add_ip_to_scaleway_allowlist.sh`, move `startup.sh`/`dev_startup.sh`), make them runnable from any directory, and have the Docker `CMD` call `scripts/startup.sh`; update the Makefile, README, and `.env.sample` accordingly ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
+* **ALLOWED_HOSTS** — drop the stale `pruefpunkt.org` entry (never legitimately reaches this server as a Host header) and gate the Android-emulator dev alias behind `DEBUG`, while keeping `127.0.0.1`/`localhost` available in all environments so production health/liveness checks aren't affected ([#28](https://github.com/Volksverpetzer/vvp_app_server/pull/28), [#33](https://github.com/Volksverpetzer/vvp_app_server/pull/33))
+* **CI** — bump `actions/setup-python` from v6 to v7 ([#30](https://github.com/Volksverpetzer/vvp_app_server/pull/30))
+
+
 # [1.3.1](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.0...v1.3.1) (2026-07-09)
 
 
