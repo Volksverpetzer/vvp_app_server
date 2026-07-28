@@ -1,12 +1,4 @@
-# [1.4.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.2...v1.4.0) (2026-07-23)
-
-
-### Features
-
-* **Podcast** — new `/proxy/podcastFeed` endpoint that fetches the podcast RSS feed (the Volksverpetzer Podigee feed by default, configurable via the `PODCAST_FEED_URL` env var) and serves parsed episodes as JSON for the app's new podcast home-feed section. Cached for 30 minutes under a constant cache key (query strings cannot bypass or evict the cache), returns a controlled `502` on upstream or parse failures, normalizes naive `pubDate` timezones to UTC, and validates `itunes:duration` values ([#27](https://github.com/Volksverpetzer/vvp_app_server/pull/27))
-
-
-# [1.3.2](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.1...v1.3.2) (2026-07-10)
+# [1.4.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.1...v1.4.0) (2026-07-23)
 
 
 ### Bug Fixes
@@ -16,6 +8,7 @@
 
 ### Features
 
+* **Podcast** — new `/proxy/podcastFeed` endpoint that fetches the podcast RSS feed (the Volksverpetzer Podigee feed by default, configurable via the `PODCAST_FEED_URL` env var) and serves parsed episodes as JSON for the app's new podcast home-feed section. Cached for 30 minutes under a constant cache key (query strings cannot bypass or evict the cache), returns a controlled `502` on upstream or parse failures, normalizes naive `pubDate` timezones to UTC, and validates `itunes:duration` values ([#27](https://github.com/Volksverpetzer/vvp_app_server/pull/27))
 * **Rate limiting** — add a `RATELIMIT_ENABLE` env toggle to disable API rate limits for local development/testing; defaults to enabled. Parsing is strict: only explicit true/false values are accepted and anything else raises at startup, so a typo can never silently disable rate limiting ([#26](https://github.com/Volksverpetzer/vvp_app_server/issues/26))
 
 
