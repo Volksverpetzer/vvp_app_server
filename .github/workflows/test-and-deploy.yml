@@ -100,6 +100,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/prerelease'
     needs: [test, docker-build]
+    # sha-tagging fixed *which* image a deploy targets, but not run ordering:
+    # without this, an older push's deploy job can still finish PATCHing
+    # after a newer push's, moving the container backwards. main (production)
+    # and prerelease (staging) deploy to different SCALEWAY_SERVICE_IDs here,
+    # so the group IS keyed by branch -- a staging deploy has no reason to
+    # block or cancel a production one and vice versa.
+    concurrency:
+      group: scaleway-deploy-${{ github.ref_name }}
+      cancel-in-progress: true
     steps:
       - name: 🔑 Login to Scaleway Container Registry
         uses: docker/login-action@v4
