@@ -1,5 +1,5 @@
 # Dockerfile snippet example
-FROM python:3.12.13
+FROM python:3.12-slim
 
 ARG BUILD_SHA=dev
 ENV BUILD_SHA=$BUILD_SHA

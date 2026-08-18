@@ -1,4 +1,4 @@
-name: Test and Release
+name: Test and Deploy
 on:
   push:
     branches:
@@ -56,6 +56,7 @@ jobs:
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/prerelease'
     outputs:
       image_tag: ${{ steps.vars.outputs.image_tag }}
+      deploy_image: ${{ steps.vars.outputs.deploy_image }}
     steps:
       - name: ⬇️ Checkout repo
         uses: actions/checkout@v7
@@ -70,6 +71,7 @@ jobs:
             echo "image_tag=staging" >> $GITHUB_OUTPUT
             echo "deploy_env=staging" >> $GITHUB_OUTPUT
           fi
+          echo "deploy_image=${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ github.sha }}" >> $GITHUB_OUTPUT
 
       - name: 🔑 Login to Scaleway Container Registry
         uses: docker/login-action@v4
@@ -79,10 +81,10 @@ jobs:
           registry: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
 
       - name: 📦 Build the Docker image
-        run: docker build --build-arg BUILD_SHA=${{ github.sha }} --build-arg BUILD_DATE=$(date -u +%Y%m%d%H%M%S) --build-arg DEPLOY_ENV=${{ steps.vars.outputs.deploy_env }} . -t ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ steps.vars.outputs.image_tag }}
+        run: docker build --build-arg BUILD_SHA=${{ github.sha }} --build-arg BUILD_DATE=$(date -u +%Y%m%d%H%M%S) --build-arg DEPLOY_ENV=${{ steps.vars.outputs.deploy_env }} . -t ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ steps.vars.outputs.image_tag }} -t ${{ steps.vars.outputs.deploy_image }}
 
       - name: 💾 Save Docker image
-        run: docker save ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ steps.vars.outputs.image_tag }} > image.tar
+        run: docker save ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ steps.vars.outputs.image_tag }} ${{ steps.vars.outputs.deploy_image }} > image.tar
 
       - name: ⬆️ Upload Docker image as artifact
         uses: actions/upload-artifact@v7
@@ -116,21 +118,24 @@ jobs:
       - name: 🚀 Push the Docker image
         run: |
           docker push ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ needs.docker-build.outputs.image_tag }}
+          docker push ${{ needs.docker-build.outputs.deploy_image }}
 
       - name: 🚀 Deploy to Production
         if: github.ref == 'refs/heads/main'
         run: |
-          curl --fail-with-body -X POST \
+          # PATCH the container to the sha-tagged image (not :latest) so a
+          # concurrent push to prerelease can't get deployed to production.
+          curl --fail-with-body -X PATCH \
             -H "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{}' \
-            "https://api.scaleway.com/containers/v1beta1/regions/${{ secrets.SCALEWAY_REGION }}/containers/${{ secrets.SCALEWAY_SERVICE_ID }}/deploy"
+            -d '{"registry_image": "${{ needs.docker-build.outputs.deploy_image }}"}' \
+            "https://api.scaleway.com/containers/v1beta1/regions/${{ secrets.SCALEWAY_REGION }}/containers/${{ secrets.SCALEWAY_SERVICE_ID }}"
 
       - name: 🚀 Deploy to Staging
         if: github.ref == 'refs/heads/prerelease'
         run: |
-          curl --fail-with-body -X POST \
+          curl --fail-with-body -X PATCH \
             -H "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d '{}' \
-            "https://api.scaleway.com/containers/v1beta1/regions/${{ secrets.SCALEWAY_REGION }}/containers/${{ secrets.SCALEWAY_STAGING_SERVICE_ID }}/deploy"
+            -d '{"registry_image": "${{ needs.docker-build.outputs.deploy_image }}"}' \
+            "https://api.scaleway.com/containers/v1beta1/regions/${{ secrets.SCALEWAY_REGION }}/containers/${{ secrets.SCALEWAY_STAGING_SERVICE_ID }}"
