@@ -7,7 +7,13 @@ import requests
 from django.test import Client, RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
-from proxycache.helper import fully_unquote, generate_token, replace_media_urls
+from proxycache.helper import (
+    fully_unquote,
+    generate_token,
+    generate_token_with_context,
+    replace_media_urls,
+    replace_media_urls_for_posts,
+)
 from proxycache.models import InstaToken, TiktokToken
 
 # Create your tests here.
@@ -262,6 +268,222 @@ class ProxyTest(TestCase):
         self.assertTrue(new["thumbnail_url"].startswith(secure_base))
         self.assertIn(f"hash={token}", new["thumbnail_url"])
         self.assertTrue(new["media_url"].startswith(secure_base))
+
+    def test_replace_media_urls_for_posts_binds_post_context(self):
+        rf = RequestFactory()
+        request = rf.get("/")
+        orig = "http://example.com/img.png"
+        posts = [{"id": "123", "media_url": orig}]
+
+        new_posts = replace_media_urls_for_posts(posts, request, "volksverpetzer")
+
+        new_url = new_posts[0]["media_url"]
+        self.assertIn("post_id=123", new_url)
+        self.assertIn("account=volksverpetzer", new_url)
+        self.assertNotIn("child_id=", new_url)
+        expected_hash = generate_token_with_context(orig, "123", "", "volksverpetzer")
+        self.assertIn(f"hash={expected_hash}", new_url)
+        # a plain generate_token(orig) hash must NOT verify this link —
+        # otherwise the post_id/account context wouldn't actually be bound.
+        self.assertNotIn(f"hash={generate_token(orig)}", new_url)
+
+    def test_replace_media_urls_for_posts_carousel_children_get_own_child_id(self):
+        rf = RequestFactory()
+        request = rf.get("/")
+        child_orig = "http://example.com/slide2.jpg"
+        posts = [
+            {
+                "id": "123",
+                "media_type": "CAROUSEL_ALBUM",
+                "children": {
+                    "data": [{"id": "c1"}, {"id": "c2", "media_url": child_orig}]
+                },
+            }
+        ]
+
+        new_posts = replace_media_urls_for_posts(posts, request, "pruefpunkt")
+
+        children = new_posts[0]["children"]["data"]
+        self.assertNotIn("media_url", children[0])  # no media_url in, none out
+        new_url = children[1]["media_url"]
+        self.assertIn("post_id=123", new_url)
+        self.assertIn("child_id=c2", new_url)
+        self.assertIn("account=pruefpunkt", new_url)
+        expected_hash = generate_token_with_context(
+            child_orig, "123", "c2", "pruefpunkt"
+        )
+        self.assertIn(f"hash={expected_hash}", new_url)
+
+    def test_replace_media_urls_for_posts_missing_id_falls_back_to_plain_token(self):
+        rf = RequestFactory()
+        request = rf.get("/")
+        orig = "http://example.com/img.png"
+        posts = [{"media_url": orig}]  # no 'id'
+
+        new_posts = replace_media_urls_for_posts(posts, request, "volksverpetzer")
+
+        new_url = new_posts[0]["media_url"]
+        self.assertNotIn("post_id=", new_url)
+        self.assertIn(f"hash={generate_token(orig)}", new_url)
+
+    def test_resolve_media_url_with_context_verifies_and_serves(self):
+        orig = "http://example.com/img.png"
+        encoded = urllib.parse.quote(orig, safe="")
+        token = generate_token_with_context(orig, "123", "", "volksverpetzer")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            mock_get.return_value.content = b"binarydata"
+            mock_get.return_value.headers = {"Content-Type": "image/png"}
+            mock_get.return_value.raise_for_status = lambda: None
+            response = self.c.get(
+                f"/proxy/media_url?hash={token}&url={encoded}"
+                "&post_id=123&account=volksverpetzer"
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"binarydata")
+
+    def test_resolve_media_url_with_context_wrong_hash_is_forbidden(self):
+        # A context link's hash must be verified with generate_token_with_context,
+        # not the plain generate_token(url) used for links without post_id.
+        orig = "http://example.com/img.png"
+        encoded = urllib.parse.quote(orig, safe="")
+        wrong_token = generate_token(orig)
+        response = self.c.get(
+            f"/proxy/media_url?hash={wrong_token}&url={encoded}"
+            "&post_id=123&account=volksverpetzer"
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_resolve_media_url_falls_back_to_fresh_url_on_expired_link(self):
+        # Primary fetch fails (expired signed URL); the proxy should re-fetch
+        # the post from Instagram and retry once with the fresh media_url.
+        #
+        # insta_feed.py and resolve_media_url.py both `import requests`, so
+        # they share the exact same module object — patching "...requests.get"
+        # via either module's path patches the same attribute for both.
+        # Nesting two separate patches of it (one per module path) doesn't
+        # give two independent mocks; the inner one silently clobbers the
+        # outer one for the whole call. One mock, dispatching on the shape
+        # of the call, is what's actually needed here.
+        stale = "http://example.com/expired-fallback-succeeds.png"
+        fresh = "http://example.com/fresh.png"
+        encoded_stale = urllib.parse.quote(stale, safe="")
+        token = generate_token_with_context(stale, "123", "", "volksverpetzer")
+
+        InstaToken.objects.create(token="tok", expires_in=3600)  # nosec
+
+        calls = []
+
+        def fake_get(*args, **kwargs):
+            calls.append((args, kwargs))
+            resp = MagicMock()
+            if "params" in kwargs:
+                # fetch_fresh_media_url's call to the Instagram Graph API
+                resp.json.return_value = {"media_url": fresh}
+                return resp
+            url = args[0] if args else kwargs.get("url")
+            if url == stale:
+                resp.raise_for_status.side_effect = requests.exceptions.HTTPError("410")
+            else:
+                resp.raise_for_status = lambda: None
+                resp.content = b"freshbytes"
+                resp.headers = {"Content-Type": "image/png"}
+            return resp
+
+        with patch(
+            "proxycache.services.resolve_media_url.requests.get",
+            side_effect=fake_get,
+        ):
+            response = self.c.get(
+                f"/proxy/media_url?hash={token}&url={encoded_stale}"
+                "&post_id=123&account=volksverpetzer"
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"freshbytes")
+        # stale attempt, Instagram lookup, fresh retry
+        self.assertEqual(len(calls), 3)
+        self.assertIn("params", calls[1][1])  # the Instagram call is the middle one
+
+    def test_resolve_media_url_returns_400_when_fallback_also_fails(self):
+        orig = "http://example.com/expired-fallback-fails.png"
+        encoded = urllib.parse.quote(orig, safe="")
+        token = generate_token_with_context(orig, "123", "", "volksverpetzer")
+
+        InstaToken.objects.create(token="tok", expires_in=3600)  # nosec
+
+        def fake_get(*args, **kwargs):
+            resp = MagicMock()
+            if "params" in kwargs:
+                # Instagram itself can't produce a fresh URL either (e.g. the
+                # post was deleted)
+                resp.json.return_value = {"error": {"code": 100}}
+            else:
+                resp.raise_for_status.side_effect = requests.exceptions.HTTPError("410")
+            return resp
+
+        with patch(
+            "proxycache.services.resolve_media_url.requests.get",
+            side_effect=fake_get,
+        ):
+            response = self.c.get(
+                f"/proxy/media_url?hash={token}&url={encoded}"
+                "&post_id=123&account=volksverpetzer"
+            )
+        self.assertEqual(response.status_code, 400)
+
+    def test_resolve_media_url_no_post_id_skips_fallback_on_failure(self):
+        # Plain (no post_id) links behave exactly as before this feature —
+        # a single failed fetch is a 400, no Instagram call is attempted.
+        orig = "http://example.com/no-post-id-context.png"
+        encoded = urllib.parse.quote(orig, safe="")
+        token = generate_token(orig)
+        calls = []
+
+        def fake_get(*args, **kwargs):
+            calls.append((args, kwargs))
+            resp = MagicMock()
+            resp.raise_for_status.side_effect = requests.exceptions.HTTPError("410")
+            return resp
+
+        with patch(
+            "proxycache.services.resolve_media_url.requests.get",
+            side_effect=fake_get,
+        ):
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 400)
+        # only the single primary fetch attempt — no post_id, so no Instagram
+        # call from fetch_fresh_media_url either
+        self.assertEqual(len(calls), 1)
+
+    def test_fetch_fresh_media_url_picks_matching_child(self):
+        from proxycache.services.insta_feed import fetch_fresh_media_url
+
+        InstaToken.objects.create(token="tok", expires_in=3600)  # nosec
+        with patch("proxycache.services.insta_feed.requests.get") as mock_get:
+            mock_get.return_value.json.return_value = {
+                "children": {
+                    "data": [
+                        {"id": "c1", "media_url": "http://example.com/1.jpg"},
+                        {"id": "c2", "media_url": "http://example.com/2.jpg"},
+                    ]
+                }
+            }
+            result = fetch_fresh_media_url("123", "c2", "volksverpetzer")
+        self.assertEqual(result, "http://example.com/2.jpg")
+
+    def test_fetch_fresh_media_url_unknown_account_returns_none(self):
+        from proxycache.services.insta_feed import fetch_fresh_media_url
+
+        result = fetch_fresh_media_url("123", "", "not-a-real-account")
+        self.assertIsNone(result)
+
+    def test_fetch_fresh_media_url_upstream_error_returns_none(self):
+        from proxycache.services.insta_feed import fetch_fresh_media_url
+
+        InstaToken.objects.create(token="tok", expires_in=3600)  # nosec
+        with patch("proxycache.services.insta_feed.requests.get") as mock_get:
+            mock_get.return_value.json.return_value = {"error": {"code": 100}}
+            result = fetch_fresh_media_url("123", "", "volksverpetzer")
+        self.assertIsNone(result)
 
     def test_resolve_media_url_with_percent_encoded_url(self):
         # A raw URL that itself contains percent-encoded characters (%2F).
