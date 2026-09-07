@@ -1,4 +1,4 @@
 .PHONY: allowlist
 
 allowlist:
-	@npx @volksverpetzer/whitelist-ip
+	@npx --yes @volksverpetzer/whitelist-ip
