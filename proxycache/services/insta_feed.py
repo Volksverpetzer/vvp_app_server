@@ -116,10 +116,17 @@ def fetch_fresh_media_url(post_id: str, child_id: str, account: str) -> str | No
     """
     if account not in ACCOUNTS or not post_id:
         return None
+    try:
+        token = getToken(account)
+    except requests.exceptions.RequestException:
+        # getToken() refreshes the stored token when expired; a network
+        # error during that refresh shouldn't turn this best-effort retry
+        # into an unhandled 500.
+        return None
     url = f"https://graph.instagram.com/v15.0/{post_id}"
     params = {
         "fields": "media_url,thumbnail_url,children{id,media_url}",
-        "access_token": getToken(account),
+        "access_token": token,
     }
     try:
         response = requests.get(url=url, params=params, timeout=10)
