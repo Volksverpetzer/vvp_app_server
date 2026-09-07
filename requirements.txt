@@ -28,3 +28,4 @@ atproto
 pandas-stubs
 django-stubs
 django-ratelimit==4.1.0
+defusedxml
