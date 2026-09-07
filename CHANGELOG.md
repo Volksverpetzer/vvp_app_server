@@ -1,3 +1,22 @@
+# [1.5.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.4.0...v1.5.0) (2026-09-07)
+
+
+### Bug Fixes
+
+* **Instagram proxy** — retry expired Instagram media URLs before giving up. Some media get noticeably shorter-lived signed CDN URLs than others in the same batch, so a `media_url` embedded on the WordPress side could already be expired even though our cache entry was still fresh; the proxy now does one retry, re-fetching that single post directly from the Instagram Graph API for a freshly signed URL before failing. Backward compatible with links generated before this deploy ([#41](https://github.com/Volksverpetzer/vvp_app_server/pull/41))
+* **Podcast** — parse the podcast feed XML with `defusedxml` instead of `ElementTree.fromstring` to avoid XXE risk on network-fetched content ([#43](https://github.com/Volksverpetzer/vvp_app_server/pull/43))
+* **Deploy** — stop passing the registry-endpoint image ref through a job output; GitHub Actions silently drops job outputs containing secrets, which was leaving the sha-tagged image ref blank for the deploy step. The ref is now reconstructed inline wherever it's used ([#39](https://github.com/Volksverpetzer/vvp_app_server/pull/39))
+* **Deploy** — add a concurrency group to the deploy job, keyed by branch, so an older run's deploy can no longer finish after a newer one's and move the container backwards ([#40](https://github.com/Volksverpetzer/vvp_app_server/pull/40))
+
+
+### Chores
+
+* **CI** — rename `test-and-release.yml` to `test-and-deploy.yml` and deploy by PATCHing the container's `registry_image` to the sha-tagged image instead of POSTing a bare `/deploy` trigger against a static `:latest`/`:staging` tag, so a concurrent push to the other branch can't get deployed to the wrong service; switch the Docker base to `python:3.12-slim` and loosen `.python-version` to `3.12` so it stays in sync with the floating base image ([#38](https://github.com/Volksverpetzer/vvp_app_server/pull/38))
+* **CI** — align GitHub Actions workflow step/job naming style with `vvp_app` (icon-prefixed names, no logic changes) ([#36](https://github.com/Volksverpetzer/vvp_app_server/pull/36))
+* **Scripts** — replace `add_ip_to_scaleway_allowlist.sh` with the shared `@volksverpetzer/whitelist-ip` CLI published from `vvp_tools`; `make allowlist` now delegates to `npx @volksverpetzer/whitelist-ip` ([#37](https://github.com/Volksverpetzer/vvp_app_server/pull/37))
+* **Dependabot** — add `cooldown.default-days` to all ecosystems that were missing it (mainly `github-actions`), matching the pattern already used for npm/uv ([#42](https://github.com/Volksverpetzer/vvp_app_server/pull/42))
+
+
 # [1.4.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.3.1...v1.4.0) (2026-07-23)
 
 

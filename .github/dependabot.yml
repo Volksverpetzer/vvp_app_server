@@ -7,3 +7,5 @@ updates:
       prefix-development: chore
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 1

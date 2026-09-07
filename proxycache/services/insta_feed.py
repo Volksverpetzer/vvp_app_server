@@ -6,7 +6,7 @@ import requests
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils.timezone import now
 
-from proxycache.helper import replace_media_urls
+from proxycache.helper import replace_media_urls_for_posts
 from proxycache.models import InstaToken
 from vvp_app_server.cache_utils import cache_response
 
@@ -40,7 +40,7 @@ def instaFeed(request: HttpRequest) -> JsonResponse | HttpResponse:
         "limit": 20,
         "fields": (
             "id,permalink,media_type,caption,timestamp,"
-            "children{media_url},media_url,thumbnail_url"
+            "children{id,media_url},media_url,thumbnail_url"
         ),
         "access_token": getToken(account),
     }
@@ -61,12 +61,12 @@ def instaFeed(request: HttpRequest) -> JsonResponse | HttpResponse:
     if not isinstance(raw_data, dict):
         # return error
         return HttpResponse(status=500)
-    processed = replace_media_urls(raw_data, request=request)
-    if not isinstance(processed, dict):
-        return JsonResponse(processed, safe=False)
-    processed.pop("paging", None)
-    processed["timestamp"] = time.time()
-    return JsonResponse(processed)
+    posts = raw_data.get("data")
+    if isinstance(posts, list):
+        raw_data["data"] = replace_media_urls_for_posts(posts, request, account)
+    raw_data.pop("paging", None)
+    raw_data["timestamp"] = time.time()
+    return JsonResponse(raw_data)
 
 
 @cache_response(lambda request, *args, **kwargs: request.get_full_path(), 60 * 10)
@@ -101,6 +101,46 @@ def instaById(request: HttpRequest, id: str) -> JsonResponse | HttpResponse:
         return JsonResponse(raw_data, safe=False)
     raw_data["timestamp"] = time.time()
     return JsonResponse(raw_data)
+
+
+def fetch_fresh_media_url(post_id: str, child_id: str, account: str) -> str | None:
+    """
+    Re-fetch a single Instagram post (or, with child_id, one of its carousel
+    children) to get a freshly signed CDN media_url. Used by
+    resolve_media_url as a one-shot retry when the previously embedded URL
+    has expired — see generate_token_with_context() for why that happens
+    even within our own cache's TTL. Returns None on any failure; the
+    caller already has a plain fetch-failed response to fall back to, so
+    there's no token-refresh-and-retry dance here like instaFeed/instaById
+    have — this is a best-effort last resort, not the primary path.
+    """
+    if account not in ACCOUNTS or not post_id:
+        return None
+    try:
+        token = getToken(account)
+    except requests.exceptions.RequestException:
+        # getToken() refreshes the stored token when expired; a network
+        # error during that refresh shouldn't turn this best-effort retry
+        # into an unhandled 500.
+        return None
+    url = f"https://graph.instagram.com/v15.0/{post_id}"
+    params = {
+        "fields": "media_url,thumbnail_url,children{id,media_url}",
+        "access_token": token,
+    }
+    try:
+        response = requests.get(url=url, params=params, timeout=10)
+        data = response.json()
+    except (requests.exceptions.RequestException, ValueError):
+        return None
+    if not isinstance(data, dict) or "error" in data:
+        return None
+    if child_id:
+        for child in data.get("children", {}).get("data", []):
+            if isinstance(child, dict) and str(child.get("id") or "") == child_id:
+                return child.get("media_url")
+        return None
+    return data.get("media_url") or data.get("thumbnail_url")
 
 
 def envToken(account: str = DEFAULT_ACCOUNT):
