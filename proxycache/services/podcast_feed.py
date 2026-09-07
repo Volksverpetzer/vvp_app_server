@@ -1,8 +1,8 @@
 import os
-import xml.etree.ElementTree as ElementTree
 from datetime import timezone as datetime_timezone
 from email.utils import parsedate_to_datetime
 
+import defusedxml.ElementTree as ElementTree
 import requests
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils import timezone
