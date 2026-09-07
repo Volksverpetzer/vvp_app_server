@@ -4,6 +4,7 @@ from email.utils import parsedate_to_datetime
 
 import defusedxml.ElementTree as ElementTree
 import requests
+from defusedxml.common import DefusedXmlException
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.utils import timezone
 
@@ -99,7 +100,11 @@ def podcastFeed(request: HttpRequest):
         response = requests.get(get_feed_url(), timeout=15)
         response.raise_for_status()
         episodes = parse_podcast_feed(response.content)
-    except (requests.exceptions.RequestException, ElementTree.ParseError):
+    except (
+        requests.exceptions.RequestException,
+        ElementTree.ParseError,
+        DefusedXmlException,
+    ):
         # Controlled 502 instead of an uncaught 500: cache_response never
         # caches non-200s, so a transient Podigee outage is not replayed.
         return HttpResponse(status=502)

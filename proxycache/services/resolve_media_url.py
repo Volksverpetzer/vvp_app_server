@@ -20,7 +20,7 @@ def _fetch(media_url: str):
     try:
         response = requests.get(media_url, timeout=10)
         response.raise_for_status()
-    except Exception:
+    except requests.exceptions.RequestException:
         return None, None
     return response.content, response.headers.get(
         "Content-Type", "application/octet-stream"
