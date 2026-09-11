@@ -26,10 +26,15 @@ jobs:
           python -m venv venv
           source venv/bin/activate
 
-      - name: 📦 Install dependencies
+      - name: 📦 Export requirements.txt for Azure Oryx build
+        # Dependencies live in pyproject.toml/uv.lock now, but Azure's Oryx
+        # builder (which does its own install from the uploaded artifact,
+        # separately from this job's venv) only understands requirements.txt.
+        # Regenerate a pinned one from the lock file on every build instead
+        # of hand-maintaining a second source of truth.
         run: |
           pip install uv
-          uv --system pip sync requirements.txt
+          uv export --locked --no-dev --format requirements-txt -o requirements.txt
 
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
 
