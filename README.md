@@ -82,15 +82,15 @@ Copy `.env.sample` to `.env` and fill in the values.
 
 ## Local Development
 
-**Prerequisites:** Python 3.12, PostgreSQL.
+**Prerequisites:** Python 3.12, PostgreSQL, [uv](https://docs.astral.sh/uv/).
 
 ```bash
-# 1. Create and activate a virtual environment
-python3 -m venv .venv
-source .venv/bin/activate     # Windows: .venv\Scripts\activate
+# 1. Install dependencies (creates .venv and installs the dev dependency
+#    group too; add --no-dev to skip it)
+uv sync
 
-# 2. Install dependencies
-pip install -r requirements.txt -r requirements-dev.txt
+# 2. Activate the virtual environment
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
 
 # 3. Configure environment
 cp .env.sample .env
