@@ -393,6 +393,59 @@ class TestNotification(TestCase):
         # pruefpunkt-only device must not get the volksverpetzer post
         self.assertNotIn(pp_device.expo_token, tokens)
 
+    def test_post_with_og_image_passes_image_to_async_task(self):
+        mock_post = {
+            "link": "https://www.volksverpetzer.de/test/",
+            "title": {"rendered": "Test"},
+            "yoast_head_json": {
+                "og_image": [{"url": r"https:\/\/mydomain.com\/og-image.jpg"}]
+            },
+        }
+        found_response = MagicMock()
+        found_response.json.return_value = [mock_post]
+        with (
+            patch(
+                "notifications.services.webhook_new_post.requests.get",
+                return_value=found_response,
+            ),
+            patch("notifications.services.webhook_new_post.async_task") as mock_async,
+        ):
+            response = self.c.post(
+                "/webhook_new_post",
+                data=example_post,
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            mock_async.call_args.kwargs["image"],
+            "https://mydomain.com/og-image.jpg",
+        )
+
+    def test_post_without_og_image_passes_none_image(self):
+        mock_post = {
+            "link": "https://www.volksverpetzer.de/test/",
+            "title": {"rendered": "Test"},
+            "yoast_head_json": {},
+        }
+        found_response = MagicMock()
+        found_response.json.return_value = [mock_post]
+        with (
+            patch(
+                "notifications.services.webhook_new_post.requests.get",
+                return_value=found_response,
+            ),
+            patch("notifications.services.webhook_new_post.async_task") as mock_async,
+        ):
+            response = self.c.post(
+                "/webhook_new_post",
+                data=example_post,
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(mock_async.call_args.kwargs["image"])
+
 
 class NotificationStatsTest(TestCase):
     def setUp(self):
@@ -630,7 +683,9 @@ class SendPushMessageTest(TestCase):
         from notifications.helper import send_push_message_delayed
 
         send_push_message_delayed([self.device], "t", "b", extra={"url": "x"})
-        mock_send.assert_called_once_with([self.device], "t", "b", {"url": "x"})
+        mock_send.assert_called_once_with(
+            [self.device], "t", "b", {"url": "x"}, image=None
+        )
         mock_sleep.assert_called_once_with(15)
 
     @patch.dict(os.environ, {"EXPO_TOKEN": "test-expo-token"})  # nosec
@@ -661,6 +716,51 @@ class SendPushMessageTest(TestCase):
 
         with self.assertRaises(ReqConnectionError):
             send_push_message([self.device], "title", "body3")
+
+    @patch("notifications.helper.PushMessageLog.objects.create")
+    @patch("notifications.helper._build_push_client")
+    def test_send_push_message_passes_image_to_push_message(
+        self, mock_build, mock_log_create
+    ):
+        ticket = MagicMock()
+        ticket.validate_response.return_value = None
+        mock_build.return_value.publish_multiple.return_value = [ticket]
+
+        from notifications.helper import send_push_message
+
+        send_push_message(
+            [self.device], "title", "body", image="https://example.com/img.jpg"
+        )
+
+        [sent_message] = mock_build.return_value.publish_multiple.call_args.args[0]
+        self.assertEqual(
+            sent_message.get_payload()["richContent"],
+            {"image": "https://example.com/img.jpg"},
+        )
+
+
+class ImagePushMessageTest(TestCase):
+    def test_payload_includes_rich_content_when_image_set(self):
+        from notifications.helper import ImagePushMessage
+
+        message = ImagePushMessage(
+            to="ExponentPushToken[test]",
+            body="body",
+            title="title",
+            image="https://example.com/img.jpg",
+        )
+        self.assertEqual(
+            message.get_payload()["richContent"],
+            {"image": "https://example.com/img.jpg"},
+        )
+
+    def test_payload_omits_rich_content_when_no_image(self):
+        from notifications.helper import ImagePushMessage
+
+        message = ImagePushMessage(
+            to="ExponentPushToken[test]", body="body", title="title"
+        )
+        self.assertNotIn("richContent", message.get_payload())
 
 
 class CheckReceiptsTest(TestCase):
