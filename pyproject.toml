@@ -23,6 +23,11 @@ dependencies = [
     "llama-index>=0.14.22,<0.15",
     "llama-index-embeddings-jinaai>=0.6.0,<0.7",
     "llama-index-vector-stores-pinecone>=0.8.0,<0.9",
+    # Transitive (via llama-index-llms-openai / llama-index-embeddings-openai),
+    # but pinned explicitly: same reasoning as lxml below — leaving it
+    # unconstrained means a future unrelated llama-index bump could drag in
+    # openai 3.x without a dedicated, reviewable range change.
+    "openai>=2.43.0,<3",
     "pinecone>=7.3.0,<8",
     "markdown2>=2.5.5,<3",
     "newspaper4k>=0.9.5,<0.10",
