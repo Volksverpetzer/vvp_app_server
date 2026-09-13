@@ -1,0 +1,29 @@
+# Local virtual environments — a developer's local venv/.venv must never
+# be copied into the image; it would silently overwrite the one `uv sync`
+# creates in the container (wrong platform, broken absolute symlinks).
+.venv/
+venv/
+env/
+ENV/
+
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+.git/
+.github/
+
+.env
+db.sqlite3
+db.sqlite3-journal
+
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+static/
+staticfiles/
+.DS_Store

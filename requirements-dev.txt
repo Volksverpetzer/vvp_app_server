@@ -1,6 +1,0 @@
-# Code quality tools - lightweight setup
-bandit
-radon
-ruff
-pre-commit
-pip-audit
