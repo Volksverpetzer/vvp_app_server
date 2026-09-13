@@ -37,8 +37,6 @@ dependencies = [
     "pandas>=3.0.3,<4",
     "matplotlib>=3.11.0,<4",
     "atproto>=0.0.68,<0.1",
-    "pandas-stubs>=3.0.3.260530,<4",
-    "django-stubs>=6.0.5,<7",
     "django-ratelimit>=4.1.0,<5",
     "defusedxml>=0.7.1,<0.8",
 ]
@@ -50,6 +48,9 @@ dev = [
     "ruff>=0.15.13,<0.16",
     "pre-commit>=4.6.2,<5",
     "pip-audit>=2.10.1,<3",
+    # Type stubs — no runtime import, only used by mypy/pyright.
+    "pandas-stubs>=3.0.3.260530,<4",
+    "django-stubs>=6.0.5,<7",
 ]
 
 [tool.ruff.lint]
