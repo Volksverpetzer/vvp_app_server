@@ -150,3 +150,29 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"registry_image": "${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ github.sha }}"}' \
             "https://api.scaleway.com/containers/v1beta1/regions/${{ secrets.SCALEWAY_REGION }}/containers/${{ secrets.SCALEWAY_STAGING_SERVICE_ID }}"
+
+  tag-release:
+    name: 🏷️ Tag Release
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    needs: [docker-push-deploy]
+    # Only this job gets write access, and only to create a tag - every
+    # other job in this workflow stays read-only.
+    permissions:
+      contents: write
+    steps:
+      - name: ⬇️ Checkout repo
+        uses: actions/checkout@v7
+
+      - name: 🏷️ Create and push version tag
+        run: |
+          version=$(grep -oP '(?<=__version__ = ")[^"]+' vvp_app_server/__init__.py)
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "Tag $tag already exists (this deploy didn't bump the version) - skipping."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Release $tag"
+          git push origin "$tag"
