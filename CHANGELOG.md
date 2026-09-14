@@ -1,3 +1,18 @@
+# [1.6.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.5.0...v1.6.0) (2026-09-14)
+
+
+### Bug Fixes
+
+* **Notifications** — send the article image via Expo's top-level `richContent` field instead of nesting it in the notification's `data` payload; the image was already being fetched from the post's `og:image` but never reached Android's native big-picture rendering because of where it was placed ([#47](https://github.com/Volksverpetzer/vvp_app_server/pull/47))
+* **Dependencies** — remove the unused `newspaper4k` dependency (never imported anywhere in this codebase), which was the only reason `lxml`/`lxml-html-clean` were pulled in; both currently carry an open High-severity CVE (XXE via default parser config; a `javascript:` URL sanitization bypass) only fixable by crossing a major version this repo deliberately caps below, so removing the unused branch closes both outright instead of deferring them ([#49](https://github.com/Volksverpetzer/vvp_app_server/pull/49))
+
+
+### Chores
+
+* **Dependencies** — migrate dependency management from an unpinned `requirements.txt` to `uv` (`pyproject.toml` + committed `uv.lock`), so builds are reproducible and version bumps are deliberate, reviewable changes instead of silent drift on every deploy; Docker, CI, and the Mimikama/Azure workflow all switched to `uv sync`/`uv export`. Also bumps `cryptography` 46 → 50, fixing 4 known CVEs on the previous version (a certificate-chain verification bypass, a PKCS7-decrypt timing oracle, an exponential-blowup DoS in chain resolution, and a bundled vulnerable OpenSSL) ([#48](https://github.com/Volksverpetzer/vvp_app_server/pull/48))
+* **Dependencies** — routine lock refresh to the latest patch/minor versions within already-declared ranges, no major bumps (`contourpy`, `coverage`, `django-stubs`, `jiter`, `matplotlib`, `tzdata`) ([#49](https://github.com/Volksverpetzer/vvp_app_server/pull/49))
+
+
 # [1.5.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.4.0...v1.5.0) (2026-09-07)
 
 

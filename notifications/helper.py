@@ -18,6 +18,26 @@ from .models import NotificationDevice, PushMessageLog
 logger = logging.getLogger(__name__)
 
 
+class ImagePushMessage(PushMessage):
+    """PushMessage that also sets Expo's `richContent.image` field.
+
+    exponent_server_sdk 2.2.0 doesn't expose richContent yet, so this
+    overrides get_payload as the SDK's own docstring recommends for
+    fields it hasn't caught up with upstream.
+    """
+
+    def __new__(cls, *args, image: str | None = None, **kwargs):
+        self = super().__new__(cls, *args, **kwargs)
+        self.image = image
+        return self
+
+    def get_payload(self):
+        payload = super().get_payload()
+        if self.image:
+            payload["richContent"] = {"image": self.image}
+        return payload
+
+
 def _build_push_client() -> PushClient:
     expo_token = os.getenv("EXPO_TOKEN")
     if not expo_token:
@@ -35,15 +55,23 @@ def _build_push_client() -> PushClient:
 
 
 def send_push_message_delayed(
-    devices: list[NotificationDevice], title: str, body: str, extra: dict | None = None
+    devices: list[NotificationDevice],
+    title: str,
+    body: str,
+    extra: dict | None = None,
+    image: str | None = None,
 ):
     """Excetute send_push_message but wait 15 seconds."""
-    send_push_message(devices, title, body, extra)
+    send_push_message(devices, title, body, extra, image=image)
     time.sleep(15)
 
 
 def send_push_message(
-    devices: list[NotificationDevice], title: str, body: str, extra: dict | None = None
+    devices: list[NotificationDevice],
+    title: str,
+    body: str,
+    extra: dict | None = None,
+    image: str | None = None,
 ):
     # Filter out devices that already have a push message with the same title
     devices_to_notify = []
@@ -63,7 +91,13 @@ def send_push_message(
     try:
         responses = client.publish_multiple(
             [
-                PushMessage(to=device.expo_token, body=body, title=title, data=extra)  # type: ignore[reportUnknownParameterType]
+                ImagePushMessage(  # type: ignore[reportUnknownParameterType]
+                    to=device.expo_token,
+                    body=body,
+                    title=title,
+                    data=extra,
+                    image=image,
+                )
                 for device in devices_to_notify
             ]
         )

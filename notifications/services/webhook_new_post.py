@@ -151,8 +151,7 @@ def webhook_new_post(request: HttpRequest):
             extra = {
                 "url": link_raw.replace("\\/", "/") if isinstance(link_raw, str) else ""
             }
-            if image_url:
-                extra["richContent"] = {"image": image_url.replace("\\/", "/")}
+            image = image_url.replace("\\/", "/") if image_url else None
 
             async_task(
                 "notifications.helper.send_push_message_delayed",
@@ -160,6 +159,7 @@ def webhook_new_post(request: HttpRequest):
                 appName + (" | Faktencheck" if isFactCheck else " | Beitrag"),
                 title,
                 extra=extra,
+                image=image,
                 group="notifications",
             )
         except Exception as e:

@@ -18,13 +18,12 @@ ENV PATH="/root/.local/bin/:$PATH"
 
 WORKDIR /app
 
-ENV VIRTUAL_ENV=/app/venv
-RUN python3 -m venv "$VIRTUAL_ENV"
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV UV_PROJECT_ENVIRONMENT=/app/venv
+ENV PATH="/app/venv/bin:$PATH"
 
-# Install dependencies (adjust as needed)
-COPY requirements.txt .
-RUN uv pip install -r requirements.txt
+# Install dependencies from the lock file (production only, no dev group)
+COPY pyproject.toml uv.lock .
+RUN uv sync --locked --no-dev
 
 # Copy your Django app code
 COPY . .
