@@ -4,6 +4,7 @@
 ### Bug Fixes
 
 * **Notifications** — send the article image via Expo's top-level `richContent` field instead of nesting it in the notification's `data` payload; the image was already being fetched from the post's `og:image` but never reached Android's native big-picture rendering because of where it was placed ([#47](https://github.com/Volksverpetzer/vvp_app_server/pull/47))
+* **Dependencies** — remove the unused `newspaper4k` dependency (never imported anywhere in this codebase), which was the only reason `lxml`/`lxml-html-clean` were pulled in; both currently carry an open High-severity CVE (XXE via default parser config; a `javascript:` URL sanitization bypass) only fixable by crossing a major version this repo deliberately caps below, so removing the unused branch closes both outright instead of deferring them ([#49](https://github.com/Volksverpetzer/vvp_app_server/pull/49))
 
 
 ### Chores
