@@ -562,6 +562,9 @@ class ProxyTest(TestCase):
                 self.assertIn("player", video)
                 self.assertEqual(video["player"]["width"], 854)
                 self.assertEqual(video["player"]["height"], 480)
+                # view counts come from the `statistics` part
+                requested_part = mock_videos.list.call_args[1]["part"]
+                self.assertIn("statistics", requested_part.split(","))
                 # cached response same
                 response2 = self.c.get("/proxy/ytAPI")
                 self.assertEqual(data, response2.json())
