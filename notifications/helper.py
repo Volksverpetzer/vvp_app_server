@@ -75,18 +75,46 @@ def send_push_message(
 ):
     # Filter out devices that already have a push message with the same title
     devices_to_notify = []
+    skipped_prior_image = None
+    skipped_count = 0
     for device in devices:
         # Check if a push log with the same title already exists for this device
-        if not PushMessageLog.objects.filter(
-            to=device, body=body, title=title
-        ).exists():
+        prior_log = (
+            PushMessageLog.objects.filter(to=device, body=body, title=title)
+            .order_by("-id")
+            .first()
+        )
+        if prior_log is None:
             devices_to_notify.append(device)
+        else:
+            skipped_count += 1
+            prior_data = prior_log.data if isinstance(prior_log.data, dict) else {}
+            skipped_prior_image = prior_data.get("image")
 
     # If no devices to notify, return early
     if not devices_to_notify:
-        logger.info("No new devices to notify with title=%s", title)
+        if skipped_count and skipped_prior_image != image:
+            logger.warning(
+                "send_push_message: skipped re-fire for title=%s body=%s "
+                "(%d device(s) already notified) — new image=%s differs from "
+                "previously sent image=%s; notification NOT resent",
+                title,
+                body,
+                skipped_count,
+                image,
+                skipped_prior_image,
+            )
+        else:
+            logger.info("No new devices to notify with title=%s", title)
         return
 
+    logger.info(
+        "send_push_message: sending title=%s body=%s image=%s to %d device(s)",
+        title,
+        body,
+        image,
+        len(devices_to_notify),
+    )
     client = _build_push_client()
     try:
         responses = client.publish_multiple(

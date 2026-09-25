@@ -124,6 +124,16 @@ def webhook_new_post(request: HttpRequest):
     title = html.unescape(
         title_field.get("rendered", "") if isinstance(title_field, dict) else ""
     )
+    logger.info(
+        "webhook_new_post: slug=%s site=%s post_date=%s post_modified=%s "
+        "featured_media=%s image_url=%s",
+        slug,
+        site,
+        post.get("date"),
+        post.get("modified"),
+        post.get("featured_media"),
+        image_url,
+    )
 
     qs = NotificationDevice.objects.order_by("id")
 
