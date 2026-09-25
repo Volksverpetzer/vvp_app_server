@@ -81,7 +81,7 @@ def send_push_message(
         # Check if a push log with the same title already exists for this device
         prior_log = (
             PushMessageLog.objects.filter(to=device, body=body, title=title)
-            .order_by("-id")
+            .order_by("-date", "-id")
             .first()
         )
         if prior_log is None:
