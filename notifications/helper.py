@@ -75,18 +75,49 @@ def send_push_message(
 ):
     # Filter out devices that already have a push message with the same title
     devices_to_notify = []
+    mismatched_prior_images: set[str | None] = set()
+    skipped_count = 0
     for device in devices:
         # Check if a push log with the same title already exists for this device
-        if not PushMessageLog.objects.filter(
-            to=device, body=body, title=title
-        ).exists():
+        prior_log = (
+            PushMessageLog.objects.filter(to=device, body=body, title=title)
+            .order_by("-date", "-id")
+            .first()
+        )
+        if prior_log is None:
             devices_to_notify.append(device)
+        else:
+            skipped_count += 1
+            prior_data = prior_log.data if isinstance(prior_log.data, dict) else {}
+            prior_image = prior_data.get("image")
+            if prior_image != image:
+                mismatched_prior_images.add(prior_image)
+
+    if mismatched_prior_images:
+        logger.warning(
+            "send_push_message: skipped re-fire for title=%s body=%s "
+            "(%d device(s) already notified) — new image=%s differs from "
+            "previously sent image(s)=%s; those devices will NOT be resent",
+            title,
+            body,
+            skipped_count,
+            image,
+            mismatched_prior_images,
+        )
 
     # If no devices to notify, return early
     if not devices_to_notify:
-        logger.info("No new devices to notify with title=%s", title)
+        if not mismatched_prior_images:
+            logger.info("No new devices to notify with title=%s", title)
         return
 
+    logger.info(
+        "send_push_message: sending title=%s body=%s image=%s to %d device(s)",
+        title,
+        body,
+        image,
+        len(devices_to_notify),
+    )
     client = _build_push_client()
     try:
         responses = client.publish_multiple(
@@ -136,7 +167,7 @@ def send_push_message(
                 to=device,
                 body=body,
                 title=title,
-                data={"ticket": response.__dict__, **(extra or {})},
+                data={"ticket": response.__dict__, "image": image, **(extra or {})},
                 id=response.id,
                 checked=False,
             )
