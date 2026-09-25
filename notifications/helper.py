@@ -167,7 +167,7 @@ def send_push_message(
                 to=device,
                 body=body,
                 title=title,
-                data={"ticket": response.__dict__, "image": image, **(extra or {})},
+                data={"ticket": response.__dict__, **(extra or {}), "image": image},
                 id=response.id,
                 checked=False,
             )
