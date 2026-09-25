@@ -51,7 +51,7 @@ def ytAPI(request: HttpRequest):
     if yt_response["items"] == []:
         return JsonResponse({"items": [], "time": timezone.now().isoformat()})
     yt_request = youtube.videos().list(
-        part="snippet,player,contentDetails",
+        part="snippet,player,contentDetails,statistics",
         id=",".join(
             [
                 item["id"]["videoId"]
