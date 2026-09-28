@@ -152,10 +152,13 @@ def webhook_new_post(request: HttpRequest):
     # label (Faktencheck/Beitrag) follows the category for both sites.
     if site == "pruefpunkt.org":
         qs = qs.filter(notification_new_pruefpunkt=True)
+        channel_id = "new_pruefpunkt"
     elif isFactCheck:
         qs = qs.filter(notification_new_fact_check=True)
+        channel_id = "new_fact_check"
     else:
         qs = qs.filter(notification_new_post=True)
+        channel_id = "new_post"
     logger.debug("Queue size: %s", queue_size())
     delete_group("notifications")
     paginator = Paginator(qs, 100)
@@ -176,6 +179,7 @@ def webhook_new_post(request: HttpRequest):
                 title,
                 extra=extra,
                 image=image,
+                channel_id=channel_id,
                 group="notifications",
             )
         except Exception as e:
