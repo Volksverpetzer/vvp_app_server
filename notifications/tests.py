@@ -355,6 +355,7 @@ class TestNotification(TestCase):
         self.assertIn(pp_device.expo_token, tokens)
         # volksverpetzer devices (pruefpunkt off by default) must be excluded
         self.assertNotIn("ExponentPushToken[WKgPMINOj-poMgtFJAJARh]", tokens)
+        self.assertEqual(mock_async.call_args.kwargs["channel_id"], "new_pruefpunkt")
 
     def test_volksverpetzer_post_targets_post_devices(self):
         pp_device = NotificationDevice.objects.create(
@@ -392,6 +393,9 @@ class TestNotification(TestCase):
         self.assertIn("ExponentPushToken[WKgPMINOj-poMgtFJAJARh]", tokens)
         # pruefpunkt-only device must not get the volksverpetzer post
         self.assertNotIn(pp_device.expo_token, tokens)
+        self.assertIn(
+            mock_async.call_args.kwargs["channel_id"], {"new_post", "new_fact_check"}
+        )
 
     def test_post_with_og_image_passes_image_to_async_task(self):
         mock_post = {
@@ -684,7 +688,7 @@ class SendPushMessageTest(TestCase):
 
         send_push_message_delayed([self.device], "t", "b", extra={"url": "x"})
         mock_send.assert_called_once_with(
-            [self.device], "t", "b", {"url": "x"}, image=None
+            [self.device], "t", "b", {"url": "x"}, image=None, channel_id=None
         )
         mock_sleep.assert_called_once_with(15)
 
@@ -737,6 +741,23 @@ class SendPushMessageTest(TestCase):
             sent_message.get_payload()["richContent"],
             {"image": "https://example.com/img.jpg"},
         )
+
+
+    @patch("notifications.helper.PushMessageLog.objects.create")
+    @patch("notifications.helper._build_push_client")
+    def test_send_push_message_passes_channel_id_to_push_message(
+        self, mock_build, mock_log_create
+    ):
+        ticket = MagicMock()
+        ticket.validate_response.return_value = None
+        mock_build.return_value.publish_multiple.return_value = [ticket]
+
+        from notifications.helper import send_push_message
+
+        send_push_message([self.device], "title", "body", channel_id="new_post")
+
+        [sent_message] = mock_build.return_value.publish_multiple.call_args.args[0]
+        self.assertEqual(sent_message.get_payload()["channelId"], "new_post")
 
 
 class ImagePushMessageTest(TestCase):

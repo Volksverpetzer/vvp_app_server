@@ -60,9 +60,10 @@ def send_push_message_delayed(
     body: str,
     extra: dict | None = None,
     image: str | None = None,
+    channel_id: str | None = None,
 ):
     """Excetute send_push_message but wait 15 seconds."""
-    send_push_message(devices, title, body, extra, image=image)
+    send_push_message(devices, title, body, extra, image=image, channel_id=channel_id)
     time.sleep(15)
 
 
@@ -72,7 +73,11 @@ def send_push_message(
     body: str,
     extra: dict | None = None,
     image: str | None = None,
+    channel_id: str | None = None,
 ):
+    # `channel_id` is the Android notification channel the app created for this
+    # push type (new_post / new_fact_check / new_pruefpunkt). Without it Android
+    # files the push under a generic "Miscellaneous" channel.
     # Filter out devices that already have a push message with the same title
     devices_to_notify = []
     mismatched_prior_images: set[str | None] = set()
@@ -128,6 +133,7 @@ def send_push_message(
                     title=title,
                     data=extra,
                     image=image,
+                    channel_id=channel_id,
                 )
                 for device in devices_to_notify
             ]
