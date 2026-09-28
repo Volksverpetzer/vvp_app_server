@@ -393,9 +393,55 @@ class TestNotification(TestCase):
         self.assertIn("ExponentPushToken[WKgPMINOj-poMgtFJAJARh]", tokens)
         # pruefpunkt-only device must not get the volksverpetzer post
         self.assertNotIn(pp_device.expo_token, tokens)
-        self.assertIn(
-            mock_async.call_args.kwargs["channel_id"], {"new_post", "new_fact_check"}
+        self.assertEqual(mock_async.call_args.kwargs["channel_id"], "new_post")
+
+    def test_volksverpetzer_fact_check_post_uses_fact_check_channel(self):
+        fc_device = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[fcDeviceTokenAAAAAAAA]",
+            notification_new_post=False,
+            notification_new_fact_check=True,
+            notification_new_pruefpunkt=False,
         )
+        post_only_device = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[poDeviceTokenAAAAAAAA]",
+            notification_new_post=True,
+            notification_new_fact_check=False,
+            notification_new_pruefpunkt=False,
+        )
+        fc_post = {
+            **example_post,
+            "taxonomies": {"category": {"faktencheck": {}}},
+        }
+        found_response = MagicMock()
+        found_response.json.return_value = [
+            {
+                "link": "https://www.volksverpetzer.de/test/",
+                "title": {"rendered": "Test"},
+                "yoast_head_json": {},
+            }
+        ]
+        with (
+            patch(
+                "notifications.services.webhook_new_post.requests.get",
+                return_value=found_response,
+            ),
+            patch("notifications.services.webhook_new_post.async_task") as mock_async,
+        ):
+            response = self.c.post(
+                "/webhook_new_post",
+                data=fc_post,
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
+            )
+        self.assertEqual(response.status_code, 200)
+        args = mock_async.call_args.args
+        devices, heading = args[1], args[2]
+        self.assertTrue(heading.endswith("Faktencheck"))
+        self.assertEqual(mock_async.call_args.kwargs["channel_id"], "new_fact_check")
+        tokens = {d.expo_token for d in devices}
+        self.assertIn(fc_device.expo_token, tokens)
+        # devices with the fact-check switch off must not get the fact-check
+        self.assertNotIn(post_only_device.expo_token, tokens)
 
     def test_post_with_og_image_passes_image_to_async_task(self):
         mock_post = {
@@ -742,6 +788,29 @@ class SendPushMessageTest(TestCase):
             {"image": "https://example.com/img.jpg"},
         )
 
+
+    @patch("notifications.helper.PushMessageLog.objects.create")
+    @patch("notifications.helper._build_push_client")
+    def test_send_push_message_log_keeps_canonical_image_over_extra(
+        self, mock_build, mock_log_create
+    ):
+        ticket = MagicMock()
+        ticket.validate_response.return_value = None
+        mock_build.return_value.publish_multiple.return_value = [ticket]
+
+        from notifications.helper import send_push_message
+
+        send_push_message(
+            [self.device],
+            "title",
+            "body",
+            extra={"image": "stale", "url": "https://example.com/a"},
+            image="canonical",
+        )
+
+        data = mock_log_create.call_args.kwargs["data"]
+        self.assertEqual(data["image"], "canonical")
+        self.assertEqual(data["url"], "https://example.com/a")
 
     @patch("notifications.helper.PushMessageLog.objects.create")
     @patch("notifications.helper._build_push_client")
