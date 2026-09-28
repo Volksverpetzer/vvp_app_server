@@ -788,7 +788,6 @@ class SendPushMessageTest(TestCase):
             {"image": "https://example.com/img.jpg"},
         )
 
-
     @patch("notifications.helper.PushMessageLog.objects.create")
     @patch("notifications.helper._build_push_client")
     def test_send_push_message_log_keeps_canonical_image_over_extra(
