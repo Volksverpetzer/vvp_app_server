@@ -72,6 +72,7 @@ if not DEBUG:
 # select the site via the ?site= query parameter, not the vhost).
 ALLOWED_HOSTS = [
     "mimikamaserver.azurewebsites.net",
+    "mimikama.volksverpetzer-app.de",
     "staging.volksverpetzer-app.de",
     "volksverpetzer-app.de",
     # Kept unconditionally (not just in DEBUG): a production health/liveness

@@ -35,6 +35,10 @@ SITES = {
         "wp_base": "https://www.pruefpunkt.org",
         "app_name": "Prüfpunkt",
     },
+    "mimikama.org": {
+        "wp_base": "https://www.mimikama.org",
+        "app_name": "Mimikama",
+    },
 }
 
 
@@ -143,10 +147,11 @@ def webhook_new_post(request: HttpRequest):
     isFactCheck = "faktencheck" in categories
     # Audience: pruefpunkt posts go to devices opting into pruefpunkt; for
     # volksverpetzer keep the existing fact-check vs. new-post split. The title
-    # label (Faktencheck/Beitrag) follows the category for both sites.
+    # label (Faktencheck/Beitrag) follows the category for both sites. Mimikama
+    # has a single article switch, so all its posts go to new_post devices.
     if site == "pruefpunkt.org":
         qs = qs.filter(notification_new_pruefpunkt=True)
-    elif isFactCheck:
+    elif isFactCheck and site != "mimikama.org":
         qs = qs.filter(notification_new_fact_check=True)
     else:
         qs = qs.filter(notification_new_post=True)
