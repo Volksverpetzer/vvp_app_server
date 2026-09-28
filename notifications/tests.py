@@ -741,6 +741,55 @@ class SendPushMessageTest(TestCase):
         send_push_message([self.device], "title", "body")
         send_mock.publish_multiple.assert_not_called()
 
+    @patch("notifications.helper._build_push_client")
+    def test_duplicate_with_matching_image_skips_without_warning(self, mock_build):
+        PushMessageLog.objects.create(
+            id="log-img-match",
+            to=self.device,
+            body="body",
+            title="title",
+            data={"image": "https://example.com/a.jpg"},
+        )
+        from notifications.helper import send_push_message
+
+        with self.assertNoLogs("notifications.helper", level="WARNING"):
+            send_push_message(
+                [self.device], "title", "body", image="https://example.com/a.jpg"
+            )
+        mock_build.return_value.publish_multiple.assert_not_called()
+
+    @patch("notifications.helper._build_push_client")
+    def test_duplicate_with_mismatching_image_warns_and_skips(self, mock_build):
+        PushMessageLog.objects.create(
+            id="log-img-mismatch",
+            to=self.device,
+            body="body",
+            title="title",
+            data={"image": "https://example.com/old.jpg"},
+        )
+        from notifications.helper import send_push_message
+
+        with self.assertLogs("notifications.helper", level="WARNING") as logs:
+            send_push_message(
+                [self.device], "title", "body", image="https://example.com/new.jpg"
+            )
+        mock_build.return_value.publish_multiple.assert_not_called()
+        self.assertIn("old.jpg", "\n".join(logs.output))
+        self.assertIn("new.jpg", "\n".join(logs.output))
+
+    @patch("notifications.helper._build_push_client")
+    def test_legacy_log_without_image_key_warns_when_image_given(self, mock_build):
+        PushMessageLog.objects.create(
+            id="log-img-legacy", to=self.device, body="body", title="title", data={}
+        )
+        from notifications.helper import send_push_message
+
+        with self.assertLogs("notifications.helper", level="WARNING"):
+            send_push_message(
+                [self.device], "title", "body", image="https://example.com/a.jpg"
+            )
+        mock_build.return_value.publish_multiple.assert_not_called()
+
     @patch("notifications.helper.PushMessageLog.objects.create")
     @patch("notifications.helper._build_push_client")
     def test_successful_send_creates_log(self, mock_build, mock_log_create):
