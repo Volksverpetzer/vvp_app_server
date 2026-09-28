@@ -63,6 +63,7 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `STRIPE_SECRET_KEY` | Stripe live secret key |
 | `INSTAGRAM_ACCESS_TOKEN` | Instagram Graph API token (volksverpetzer account) |
 | `INSTAGRAM_ACCESS_TOKEN_PRUEFPUNKT` | Instagram Graph API token (pruefpunkt account) |
+| `INSTAGRAM_ACCESS_TOKEN_MIMIKAMA` | Instagram Graph API token (mimikama_org account) |
 | `BSKY_HANDLE` | Bluesky handle for feed fetching (volksverpetzer) |
 | `BSKY_PWD` | Bluesky password for feed fetching (volksverpetzer) |
 | `BSKY_HANDLE_PRUEFPUNKT` | Bluesky handle for feed fetching (pruefpunkt, optional) |
