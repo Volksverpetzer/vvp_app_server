@@ -156,6 +156,14 @@ class ProxyTest(TestCase):
                 mock_get.call_args[1]["params"]["access_token"], "pp_env_token"
             )
 
+    @patch("proxycache.services.insta_feed.requests.get")
+    def test_insta_mimikama_account_uses_mimikama_env_token(self, mock_get):
+        mock_get.return_value.json.return_value = {"data": []}
+        with patch.dict(os.environ, {"INSTAGRAM_ACCESS_TOKEN_MIMIKAMA": "mm_env"}):
+            response = self.c.get("/proxy/instaFeed?account=mimikama_org")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_get.call_args[1]["params"]["access_token"], "mm_env")
+
     @patch("proxycache.services.insta_feed.refreshInstaToken")
     def test_get_token_partial_refresh_falls_back_to_env(self, mock_refresh):
         from proxycache.services.insta_feed import getToken

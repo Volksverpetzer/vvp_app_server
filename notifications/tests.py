@@ -357,6 +357,50 @@ class TestNotification(TestCase):
         self.assertNotIn("ExponentPushToken[WKgPMINOj-poMgtFJAJARh]", tokens)
         self.assertEqual(mock_async.call_args.kwargs["channel_id"], "new_pruefpunkt")
 
+    def test_mimikama_post_uses_mimikama_site_and_post_devices(self):
+        mm_device = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[mmDeviceTokenAAAAAAAA]",
+            notification_new_post=True,
+            notification_new_fact_check=False,
+            notification_new_pruefpunkt=False,
+        )
+        mm_post = {
+            **example_post,
+            "post_permalink": "https://www.mimikama.org/some-article/",
+            # even a fact-check category must not exclude Mimikama devices,
+            # which have no fact-check switch
+            "taxonomies": {"category": {"faktencheck": {}}},
+        }
+        found_response = MagicMock()
+        found_response.json.return_value = [
+            {
+                "link": "https://www.mimikama.org/some-article/",
+                "title": {"rendered": "MM Test"},
+                "yoast_head_json": {},
+            }
+        ]
+        with (
+            patch(
+                "notifications.services.webhook_new_post.requests.get",
+                return_value=found_response,
+            ) as mock_get,
+            patch("notifications.services.webhook_new_post.async_task") as mock_async,
+        ):
+            response = self.c.post(
+                "/webhook_new_post",
+                data=mm_post,
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            mock_get.call_args.args[0].startswith("https://www.mimikama.org/")
+        )
+        args = mock_async.call_args.args
+        devices, heading = args[1], args[2]
+        self.assertEqual(heading, "Mimikama | Beitrag")
+        self.assertIn(mm_device.expo_token, {d.expo_token for d in devices})
+
     def test_volksverpetzer_post_targets_post_devices(self):
         pp_device = NotificationDevice.objects.create(
             expo_token="ExponentPushToken[ppDeviceTokenBBBBBBBB]",

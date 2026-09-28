@@ -35,6 +35,10 @@ SITES = {
         "wp_base": "https://www.pruefpunkt.org",
         "app_name": "Prüfpunkt",
     },
+    "mimikama.org": {
+        "wp_base": "https://www.mimikama.org",
+        "app_name": "Mimikama",
+    },
 }
 
 
@@ -140,7 +144,9 @@ def webhook_new_post(request: HttpRequest):
     taxonomies = data.get("taxonomies")
     category_raw = taxonomies.get("category") if isinstance(taxonomies, dict) else None
     categories = category_raw if isinstance(category_raw, dict) else {}
-    isFactCheck = "faktencheck" in categories
+    # Mimikama has a single article switch and no fact-check label, so its
+    # posts are never treated as fact-checks (audience, channel and heading).
+    isFactCheck = "faktencheck" in categories and site != "mimikama.org"
     # Audience: pruefpunkt posts go to devices opting into pruefpunkt; for
     # volksverpetzer keep the existing fact-check vs. new-post split. The title
     # label (Faktencheck/Beitrag) follows the category for both sites.
