@@ -397,7 +397,7 @@ class TestNotification(TestCase):
         )
         args = mock_async.call_args.args
         devices, heading = args[1], args[2]
-        self.assertTrue(heading.startswith("Mimikama"))
+        self.assertEqual(heading, "Mimikama | Beitrag")
         self.assertIn(mm_device.expo_token, {d.expo_token for d in devices})
 
     def test_volksverpetzer_post_targets_post_devices(self):
