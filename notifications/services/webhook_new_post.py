@@ -35,6 +35,10 @@ SITES = {
         "wp_base": "https://www.pruefpunkt.org",
         "app_name": "Prüfpunkt",
     },
+    "mimikama.org": {
+        "wp_base": "https://www.mimikama.org",
+        "app_name": "Mimikama",
+    },
 }
 
 
@@ -140,16 +144,21 @@ def webhook_new_post(request: HttpRequest):
     taxonomies = data.get("taxonomies")
     category_raw = taxonomies.get("category") if isinstance(taxonomies, dict) else None
     categories = category_raw if isinstance(category_raw, dict) else {}
-    isFactCheck = "faktencheck" in categories
+    # Mimikama has a single article switch and no fact-check label, so its
+    # posts are never treated as fact-checks (audience, channel and heading).
+    isFactCheck = "faktencheck" in categories and site != "mimikama.org"
     # Audience: pruefpunkt posts go to devices opting into pruefpunkt; for
     # volksverpetzer keep the existing fact-check vs. new-post split. The title
     # label (Faktencheck/Beitrag) follows the category for both sites.
     if site == "pruefpunkt.org":
         qs = qs.filter(notification_new_pruefpunkt=True)
+        channel_id = "new_pruefpunkt"
     elif isFactCheck:
         qs = qs.filter(notification_new_fact_check=True)
+        channel_id = "new_fact_check"
     else:
         qs = qs.filter(notification_new_post=True)
+        channel_id = "new_post"
     logger.debug("Queue size: %s", queue_size())
     delete_group("notifications")
     paginator = Paginator(qs, 100)
@@ -170,6 +179,7 @@ def webhook_new_post(request: HttpRequest):
                 title,
                 extra=extra,
                 image=image,
+                channel_id=channel_id,
                 group="notifications",
             )
         except Exception as e:

@@ -16,6 +16,8 @@ DEFAULT_ACCOUNT = "volksverpetzer"
 ACCOUNTS = {
     "volksverpetzer": {"token_env": "INSTAGRAM_ACCESS_TOKEN"},
     "pruefpunkt": {"token_env": "INSTAGRAM_ACCESS_TOKEN_PRUEFPUNKT"},
+    # The Mimikama app requests its handle as the account.
+    "mimikama_org": {"token_env": "INSTAGRAM_ACCESS_TOKEN_MIMIKAMA"},
 }
 
 

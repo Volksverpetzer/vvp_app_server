@@ -32,7 +32,7 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 | `GET` | `/task_monitor` | notifications | Django-Q task queue status |
 | `GET` | `/receipts_monitor` | notifications | Push receipt monitoring |
 | `POST` | `/paymentIntent` | payment | Create Stripe payment intent |
-| `GET` | `/proxy/instaFeed` | proxycache | Instagram feed (`?account=volksverpetzer\|pruefpunkt`) |
+| `GET` | `/proxy/instaFeed` | proxycache | Instagram feed (`?account=volksverpetzer\|pruefpunkt\|mimikama_org`) |
 | `GET` | `/proxy/instaById/<id>` | proxycache | Single Instagram post |
 | `GET` | `/proxy/blueskyFeed` | proxycache | Bluesky feed (`?account=volksverpetzer\|pruefpunkt\|bot`) |
 | `GET` | `/proxy/tiktokFeed` | proxycache | TikTok feed |
@@ -63,6 +63,7 @@ Copy `.env.sample` to `.env` and fill in the values.
 | `STRIPE_SECRET_KEY` | Stripe live secret key |
 | `INSTAGRAM_ACCESS_TOKEN` | Instagram Graph API token (volksverpetzer account) |
 | `INSTAGRAM_ACCESS_TOKEN_PRUEFPUNKT` | Instagram Graph API token (pruefpunkt account) |
+| `INSTAGRAM_ACCESS_TOKEN_MIMIKAMA` | Instagram Graph API token (mimikama_org account) |
 | `BSKY_HANDLE` | Bluesky handle for feed fetching (volksverpetzer) |
 | `BSKY_PWD` | Bluesky password for feed fetching (volksverpetzer) |
 | `BSKY_HANDLE_PRUEFPUNKT` | Bluesky handle for feed fetching (pruefpunkt, optional) |
