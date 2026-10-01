@@ -235,6 +235,10 @@ def check_receipts(responses: Iterable[PushMessage]):
 RECEIPT_MIN_AGE = timedelta(minutes=15)
 RECEIPT_MAX_AGE = timedelta(hours=24)
 RECEIPT_BATCH_SIZE = 1000
+# Above this failing share (with enough receipts to be meaningful) the run logs
+# an ERROR, which error tracking turns into an alert.
+RECEIPT_ALERT_RATE = 0.10
+RECEIPT_ALERT_MIN_COUNT = 50
 
 
 def process_receipts() -> dict[str, int]:
@@ -285,6 +289,15 @@ def process_receipts() -> dict[str, int]:
 
     if stats["checked"]:
         logger.info("process_receipts: %s", stats)
+        if (
+            stats["checked"] >= RECEIPT_ALERT_MIN_COUNT
+            and stats["errors"] / stats["checked"] > RECEIPT_ALERT_RATE
+        ):
+            logger.error(
+                "High push receipt failure rate: %d/%d receipts failed",
+                stats["errors"],
+                stats["checked"],
+            )
         if stats["errors"]:
             logger.warning(
                 "Failing receipts: %.2f%% (%d/%d)",

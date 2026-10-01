@@ -1046,6 +1046,25 @@ class ProcessReceiptsTest(TestCase):
 
         self.assertFalse(PushMessageLog.objects.get(pk="pending").checked)
 
+    @patch("notifications.helper._build_push_client")
+    def test_high_failure_rate_logs_error(self, mock_build):
+        device = NotificationDevice.objects.create(expo_token="ExponentPushToken[h]")
+        receipts = []
+        for i in range(60):
+            self._log(device, f"r{i}", 30)
+            failed = i < 12  # 20% > 10% threshold
+            receipts.append(
+                self._receipt(f"r{i}", "error" if failed else "ok", "MessageTooBig")
+                if failed
+                else self._receipt(f"r{i}")
+            )
+        mock_build.return_value.check_receipts.return_value = receipts
+        from notifications.helper import process_receipts
+
+        with self.assertLogs("notifications.helper", level="ERROR") as logs:
+            process_receipts()
+        self.assertTrue(any("High push receipt failure" in m for m in logs.output))
+
     def test_migration_creates_schedule(self):
         from django_q.models import Schedule
 
