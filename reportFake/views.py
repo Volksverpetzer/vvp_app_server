@@ -1,9 +1,8 @@
 """Views for the reportFake app.
 
 LEGACY: current app versions submit fake reports through the generic
-``contact`` app instead. This pipeline (report -> triage -> Bluesky
-publish -> status polling) stays active for backward compatibility
-with older app versions and in case we want to revive it later.
+``contact`` app instead. Reports are forwarded to Asana; the endpoints
+stay active for backward compatibility with older app versions.
 """
 
 import json
@@ -11,18 +10,13 @@ import logging
 import os
 import uuid
 
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, JsonResponse
-from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import (  # type: ignore[reportMissingTypeStubs]
     ratelimit,
 )
 
 from contact.asana import create_asana_task
-from notifications.helper import send_push_message
-from notifications.models import NotificationDevice
 
 from .models import FakeReport
 
@@ -113,86 +107,6 @@ def reportFake(request: HttpRequest):
         report.posted_to_asana = True
         report.save(update_fields=["posted_to_asana"])
     return JsonResponse({"success": True, "id": report.id})
-
-
-@login_required
-def triageFake(request: HttpRequest):
-    reports = list(
-        FakeReport.objects.filter(
-            post_id=None,
-            description__isnull=False,
-            allowed_public=True,  # Only show reports that haven't been archived
-        )
-        .exclude(description__exact="reportDescription")
-        .order_by("-date")[:50]
-    )
-    return render(request, "reportFake/triage.html", {"reports": reports})
-
-
-@login_required
-def archiveFake(request: HttpRequest):
-    if request.method == "POST":
-        id = request.POST.get("report_id")
-        print(id)
-        report = FakeReport.objects.get(id=id)
-        report.allowed_public = False
-        report.save()
-        return redirect("triageFake")
-    else:
-        logger.error("Invalid request method")
-        return redirect("triageFake")
-
-
-@login_required
-def assign_bluesky(request: HttpRequest):
-    if request.method == "POST":
-        report_id = request.POST.get("report_id")
-        bluesky_url = request.POST.get("bluesky_url")
-
-        if not report_id or not bluesky_url:
-            messages.error(request, "Missing required fields")
-            return redirect("triageFake")
-
-        # Validate URL to prevent XSS
-        if not bluesky_url.lower().startswith(("http://", "https://")):
-            messages.error(
-                request, "Invalid URL format. URL must start with http:// or https://"
-            )
-            return redirect("triageFake")
-
-        try:
-            report = FakeReport.objects.get(id=report_id)
-
-            # Send notification to the user if they have a device token
-            if report.token:
-                try:
-                    device = NotificationDevice.objects.get(token=report.token)
-                    notification_title = "Dein Fake-Report wurde veröffentlicht"
-                    notification_body = (
-                        "Dein Fake-Report wurde auf Bluesky veröffentlicht. "
-                        "Klicke hier, um ihn anzusehen."
-                    )
-                    send_push_message(
-                        [device],
-                        title=notification_title,
-                        body=notification_body,
-                        extra={"url": bluesky_url},
-                    )
-                except NotificationDevice.DoesNotExist:
-                    logger.info(
-                        "No notification device found for token: %s", report.token
-                    )
-                except Exception as e:
-                    logger.error("Error sending notification: %s", str(e))
-
-            messages.success(request, "Bluesky URL assigned successfully")
-        except FakeReport.DoesNotExist:
-            messages.error(request, "Report not found")
-        except Exception as e:
-            logger.error("Error assigning Bluesky URL: %s", str(e))
-            messages.error(request, "An error occurred while assigning the Bluesky URL")
-
-    return redirect("triageFake")
 
 
 def statusFake(request: HttpRequest, report_id: uuid.UUID):

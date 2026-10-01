@@ -169,38 +169,6 @@ class ReportFakeViewsTest(TestCase):
         self.client = Client()
         self.client.login(username="test", password="dummy_password")  # nosec
 
-    def test_triageFake_shows_reports(self):
-        FakeReport.objects.create(description="d", url="u", more_info="m")
-        response = self.client.get("/triageFake")
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "d")
-
-    def test_triageFake_javascript_url_rendered_as_text_not_link(self):
-        FakeReport.objects.create(
-            description="xss",
-            url="javascript:alert(1)",
-            more_info="m",
-            allowed_public=True,
-        )
-        response = self.client.get("/triageFake")
-        self.assertEqual(response.status_code, 200)
-        content = response.content.decode()
-        self.assertNotIn('href="javascript:alert(1)"', content)
-        self.assertIn("javascript:alert(1)", content)
-
-    def test_assign_bluesky_rejects_invalid_scheme(self):
-        report = FakeReport.objects.create(
-            description="d",
-            url="https://example.com",
-            more_info="m",
-            allowed_public=True,
-        )
-        response = self.client.post(
-            "/assign-bluesky",
-            {"report_id": str(report.id), "bluesky_url": "javascript:void(0)"},
-        )
-        self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
-
     def test_statusFake(self):
         response = self.client.get("/statusFake/999")
         self.assertEqual(response.status_code, 404)
@@ -226,22 +194,6 @@ class ReportFakeViewsTest(TestCase):
         self.assertEqual(data["status"], "posted")
         self.assertIsNone(data["url"])
 
-    def test_archiveFake_post_archives_report(self):
-        report = FakeReport.objects.create(
-            description="d",
-            url="https://example.com",
-            more_info="m",
-            allowed_public=True,
-        )
-        response = self.client.post("/archiveFake", {"report_id": str(report.id)})
-        self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
-        report.refresh_from_db()
-        self.assertFalse(report.allowed_public)
-
-    def test_archiveFake_get_redirects(self):
-        response = self.client.get("/archiveFake")
-        self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
-
     def test_statusFake_pending(self):
         report = FakeReport.objects.create(
             description="d", url="https://example.com", more_info="m"
@@ -253,28 +205,6 @@ class ReportFakeViewsTest(TestCase):
     def test_statusFake_not_found_with_valid_uuid(self):
         response = self.client.get(f"/statusFake/{uuid.uuid4()}")
         self.assertEqual(response.status_code, 404)
-
-    def test_assign_bluesky_missing_fields_redirects(self):
-        response = self.client.post(
-            "/assign-bluesky", {"report_id": "", "bluesky_url": ""}
-        )
-        self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
-
-    def test_assign_bluesky_valid_post_redirects(self):
-        report = FakeReport.objects.create(
-            description="d",
-            url="https://example.com",
-            more_info="m",
-            allowed_public=True,
-        )
-        response = self.client.post(
-            "/assign-bluesky",
-            {
-                "report_id": str(report.id),
-                "bluesky_url": "https://bsky.app/profile/test/post/1",
-            },
-        )
-        self.assertRedirects(response, "/triageFake", fetch_redirect_response=False)
 
     def test_ratelimit_view_returns_429(self):
         from reportFake.views import ratelimit_view
