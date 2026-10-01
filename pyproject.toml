@@ -24,6 +24,7 @@ dependencies = [
     "atproto>=0.0.68,<0.1",
     "django-ratelimit>=4.1.0,<5",
     "defusedxml>=0.7.1,<0.8",
+    "sentry-sdk>=2.0,<3",
 ]
 
 [dependency-groups]
