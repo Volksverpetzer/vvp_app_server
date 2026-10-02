@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from datetime import timedelta
 from typing import Iterable
 
 import requests
@@ -11,6 +12,7 @@ from exponent_server_sdk import (  # type: ignore[reportUnknownParameterType]
     PushServerError,
     PushTicketError,
 )
+from django.utils import timezone
 from requests.exceptions import ConnectionError, HTTPError
 
 from .models import NotificationDevice, PushMessageLog
@@ -226,3 +228,81 @@ def check_receipts(responses: Iterable[PushMessage]):
     except Exception as exc:
         logger.exception("Unexpected error in check_receipts: %s", exc)
         raise
+
+
+# Expo makes receipts available ~15 minutes after sending and keeps them for
+# 24 hours; getReceipts accepts at most 1000 ids per request.
+RECEIPT_MIN_AGE = timedelta(minutes=15)
+RECEIPT_MAX_AGE = timedelta(hours=24)
+RECEIPT_BATCH_SIZE = 1000
+# Above this failing share (with enough receipts to be meaningful) the run logs
+# an ERROR, which error tracking turns into an alert.
+RECEIPT_ALERT_RATE = 0.10
+RECEIPT_ALERT_MIN_COUNT = 50
+
+
+def process_receipts() -> dict[str, int]:
+    """Check Expo receipts for recent unchecked pushes (scheduled task).
+
+    Marks every log whose receipt Expo returned as ``checked`` (logs without a
+    receipt yet are retried on the next run until they age out), deletes
+    devices reported as ``DeviceNotRegistered``, and logs a warning with the
+    failing share so delivery problems show up in the logs.
+    """
+    now = timezone.now()
+    pending = PushMessageLog.objects.filter(
+        checked=False,
+        date__lte=now - RECEIPT_MIN_AGE,
+        date__gt=now - RECEIPT_MAX_AGE,
+    ).order_by("date")
+    ids = list(pending.values_list("id", flat=True))
+    stats = {"checked": 0, "errors": 0, "devices_removed": 0}
+    if not ids:
+        return stats
+
+    client = _build_push_client()
+    for start in range(0, len(ids), RECEIPT_BATCH_SIZE):
+        batch = ids[start : start + RECEIPT_BATCH_SIZE]
+        # The SDK only reads `.id`, so plain id holders are enough.
+        receipts = client.check_receipts([PushMessageLog(id=i) for i in batch])
+        errors = [r for r in receipts if r.status != "ok"]
+        unregistered = [
+            r.id
+            for r in errors
+            if isinstance(r.details, dict)
+            and r.details.get("error") == "DeviceNotRegistered"
+        ]
+        for receipt in errors:
+            logger.error("Receipt error: %s", receipt)
+        if unregistered:
+            device_ids = PushMessageLog.objects.filter(id__in=unregistered).values(
+                "to_id"
+            )
+            removed, _ = NotificationDevice.objects.filter(id__in=device_ids).delete()
+            stats["devices_removed"] += removed
+        # Deleted devices cascade-delete their logs, so mark what's left.
+        PushMessageLog.objects.filter(id__in=[r.id for r in receipts]).update(
+            checked=True
+        )
+        stats["checked"] += len(receipts)
+        stats["errors"] += len(errors)
+
+    if stats["checked"]:
+        logger.info("process_receipts: %s", stats)
+        if (
+            stats["checked"] >= RECEIPT_ALERT_MIN_COUNT
+            and stats["errors"] / stats["checked"] > RECEIPT_ALERT_RATE
+        ):
+            logger.error(
+                "High push receipt failure rate: %d/%d receipts failed",
+                stats["errors"],
+                stats["checked"],
+            )
+        if stats["errors"]:
+            logger.warning(
+                "Failing receipts: %.2f%% (%d/%d)",
+                100 * stats["errors"] / stats["checked"],
+                stats["errors"],
+                stats["checked"],
+            )
+    return stats

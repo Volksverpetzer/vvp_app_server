@@ -983,6 +983,96 @@ class CheckReceiptsTest(TestCase):
             check_receipts([])
 
 
+class ProcessReceiptsTest(TestCase):
+    def _log(self, device, id_, age_minutes, checked=False):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        log = PushMessageLog.objects.create(
+            to=device, body="b", title="t", data={}, id=id_, checked=checked
+        )
+        PushMessageLog.objects.filter(pk=id_).update(
+            date=timezone.now() - timedelta(minutes=age_minutes)
+        )
+        return log
+
+    def _receipt(self, id_, status="ok", error=None):
+        return MagicMock(
+            id=id_, status=status, details={"error": error} if error else None
+        )
+
+    @patch("notifications.helper._build_push_client")
+    def test_marks_checked_and_removes_unregistered_devices(self, mock_build):
+        good = NotificationDevice.objects.create(expo_token="ExponentPushToken[g]")
+        dead = NotificationDevice.objects.create(expo_token="ExponentPushToken[d]")
+        self._log(good, "ok-1", 30)
+        self._log(dead, "dead-1", 30)
+        mock_build.return_value.check_receipts.return_value = [
+            self._receipt("ok-1"),
+            self._receipt("dead-1", "error", "DeviceNotRegistered"),
+        ]
+        from notifications.helper import process_receipts
+
+        stats = process_receipts()
+
+        self.assertEqual(stats["checked"], 2)
+        self.assertEqual(stats["errors"], 1)
+        self.assertFalse(NotificationDevice.objects.filter(pk=dead.pk).exists())
+        self.assertTrue(NotificationDevice.objects.filter(pk=good.pk).exists())
+        self.assertTrue(PushMessageLog.objects.get(pk="ok-1").checked)
+
+    @patch("notifications.helper._build_push_client")
+    def test_skips_too_new_old_and_already_checked(self, mock_build):
+        device = NotificationDevice.objects.create(expo_token="ExponentPushToken[s]")
+        self._log(device, "new", 5)
+        self._log(device, "old", 25 * 60)
+        self._log(device, "done", 30, checked=True)
+        from notifications.helper import process_receipts
+
+        stats = process_receipts()
+
+        self.assertEqual(stats["checked"], 0)
+        mock_build.return_value.check_receipts.assert_not_called()
+
+    @patch("notifications.helper._build_push_client")
+    def test_missing_receipt_stays_unchecked_for_retry(self, mock_build):
+        device = NotificationDevice.objects.create(expo_token="ExponentPushToken[m]")
+        self._log(device, "pending", 30)
+        mock_build.return_value.check_receipts.return_value = []
+        from notifications.helper import process_receipts
+
+        process_receipts()
+
+        self.assertFalse(PushMessageLog.objects.get(pk="pending").checked)
+
+    @patch("notifications.helper._build_push_client")
+    def test_high_failure_rate_logs_error(self, mock_build):
+        device = NotificationDevice.objects.create(expo_token="ExponentPushToken[h]")
+        receipts = []
+        for i in range(60):
+            self._log(device, f"r{i}", 30)
+            failed = i < 12  # 20% > 10% threshold
+            receipts.append(
+                self._receipt(f"r{i}", "error" if failed else "ok", "MessageTooBig")
+                if failed
+                else self._receipt(f"r{i}")
+            )
+        mock_build.return_value.check_receipts.return_value = receipts
+        from notifications.helper import process_receipts
+
+        with self.assertLogs("notifications.helper", level="ERROR") as logs:
+            process_receipts()
+        self.assertTrue(any("High push receipt failure" in m for m in logs.output))
+
+    def test_migration_creates_schedule(self):
+        from django_q.models import Schedule
+
+        schedule = Schedule.objects.get(name="Check Expo push receipts")
+        self.assertEqual(schedule.func, "notifications.helper.process_receipts")
+        self.assertEqual(schedule.minutes, 30)
+
+
 class TaskMonitorViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="monitor", password="pw")  # nosec
