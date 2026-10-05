@@ -103,12 +103,19 @@ jobs:
     # sha-tagging fixed *which* image a deploy targets, but not run ordering:
     # without this, an older push's deploy job can still finish PATCHing
     # after a newer push's, moving the container backwards. main (production)
-    # and prerelease (staging) deploy to different SCALEWAY_SERVICE_IDs here,
+    # and prerelease (staging) deploy to different SCALEWAY_SERVICE_IDs here
+    # (production also updates the Mimikama container),
     # so the group IS keyed by branch -- a staging deploy has no reason to
     # block or cancel a production one and vice versa.
+    #
+    # cancel-in-progress is deliberately false: main now PATCHes two containers
+    # (production, then Mimikama), and cancelling a run between the two would
+    # leave them on different versions. A newer run waits for the running one
+    # to finish (GitHub keeps only the latest pending run), so ordering is
+    # still preserved.
     concurrency:
       group: scaleway-deploy-${{ github.ref_name }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     steps:
       - name: 🔑 Login to Scaleway Container Registry
         uses: docker/login-action@v4
@@ -116,6 +123,21 @@ jobs:
           username: nologin
           password: ${{ secrets.SCALEWAY_API_KEY }}
           registry: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+
+      # Fail before touching any container: a missing Mimikama secret would
+      # otherwise only surface after production was already updated.
+      - name: ✅ Check deploy configuration
+        if: github.ref == 'refs/heads/main'
+        env:
+          SCALEWAY_SERVICE_ID: ${{ secrets.SCALEWAY_SERVICE_ID }}
+          SCALEWAY_MIMIKAMA_SERVICE_ID: ${{ secrets.SCALEWAY_MIMIKAMA_SERVICE_ID }}
+        run: |
+          for var in SCALEWAY_SERVICE_ID SCALEWAY_MIMIKAMA_SERVICE_ID; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Repository secret $var is not set"
+              exit 1
+            fi
+          done
 
       - name: ⬇️ Download Docker image
         uses: actions/download-artifact@v8
@@ -141,6 +163,20 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"registry_image": "${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ github.sha }}"}' \
             "https://api.scaleway.com/containers/v1beta1/regions/${{ secrets.SCALEWAY_REGION }}/containers/${{ secrets.SCALEWAY_SERVICE_ID }}"
+
+      # Mimikama runs the same image as production (its own container + DB,
+      # since NotificationDevice has no per-app column), deployed in lockstep
+      # so it can't drift behind like the old Azure deployment (separate branch) did.
+      # Runs after the production PATCH: if production fails, Mimikama is
+      # not touched.
+      - name: 🚀 Deploy to Mimikama
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl --fail-with-body -X PATCH \
+            -H "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"registry_image": "${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}/my-docker-image:${{ github.sha }}"}' \
+            "https://api.scaleway.com/containers/v1beta1/regions/${{ secrets.SCALEWAY_REGION }}/containers/${{ secrets.SCALEWAY_MIMIKAMA_SERVICE_ID }}"
 
       - name: 🚀 Deploy to Staging
         if: github.ref == 'refs/heads/prerelease'

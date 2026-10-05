@@ -155,9 +155,8 @@ The container starts both `gunicorn` (port 8080) and `qcluster` via the `CMD` in
 
 ## CI/CD
 
-Two GitHub Actions workflows are defined in `.github/workflows/`:
+One GitHub Actions workflow is defined in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| `test-and-release.yml` | Push to any branch | Runs the Django test suite against a PostgreSQL service container |
-| `build-mimikama.yml` | Push to `mimikama` branch | Builds and deploys the app to Azure App Service (`mimikamaserver`) |
+| `test-and-deploy.yml` | Push to any branch | Runs the Django test suite; on `main` also deploys the image to the production **and Mimikama** Scaleway containers (needs the `SCALEWAY_MIMIKAMA_SERVICE_ID` secret), on `prerelease` to staging |
