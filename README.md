@@ -159,5 +159,5 @@ Two GitHub Actions workflows are defined in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| `test-and-release.yml` | Push to any branch | Runs the Django test suite against a PostgreSQL service container |
+| `test-and-deploy.yml` | Push to any branch | Runs the Django test suite; on `main` also deploys the image to the production **and Mimikama** Scaleway containers (needs the `SCALEWAY_MIMIKAMA_SERVICE_ID` secret), on `prerelease` to staging |
 | `build-mimikama.yml` | Push to `mimikama` branch | Builds and deploys the app to Azure App Service (`mimikamaserver`) |
