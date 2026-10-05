@@ -107,9 +107,15 @@ jobs:
     # (production also updates the Mimikama container),
     # so the group IS keyed by branch -- a staging deploy has no reason to
     # block or cancel a production one and vice versa.
+    #
+    # cancel-in-progress is deliberately false: main now PATCHes two containers
+    # (production, then Mimikama), and cancelling a run between the two would
+    # leave them on different versions. A newer run waits for the running one
+    # to finish (GitHub keeps only the latest pending run), so ordering is
+    # still preserved.
     concurrency:
       group: scaleway-deploy-${{ github.ref_name }}
-      cancel-in-progress: true
+      cancel-in-progress: false
     steps:
       - name: 🔑 Login to Scaleway Container Registry
         uses: docker/login-action@v4
@@ -117,6 +123,21 @@ jobs:
           username: nologin
           password: ${{ secrets.SCALEWAY_API_KEY }}
           registry: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+
+      # Fail before touching any container: a missing Mimikama secret would
+      # otherwise only surface after production was already updated.
+      - name: ✅ Check deploy configuration
+        if: github.ref == 'refs/heads/main'
+        env:
+          SCALEWAY_SERVICE_ID: ${{ secrets.SCALEWAY_SERVICE_ID }}
+          SCALEWAY_MIMIKAMA_SERVICE_ID: ${{ secrets.SCALEWAY_MIMIKAMA_SERVICE_ID }}
+        run: |
+          for var in SCALEWAY_SERVICE_ID SCALEWAY_MIMIKAMA_SERVICE_ID; do
+            if [ -z "${!var}" ]; then
+              echo "::error::Repository secret $var is not set"
+              exit 1
+            fi
+          done
 
       - name: ⬇️ Download Docker image
         uses: actions/download-artifact@v8
