@@ -8,7 +8,7 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 |-----|----------------|
 | **factApi** | `/googleFact` — Google Fact Check API proxy |
 | **contact** | `/contact` — generic contact requests (feedback, fake reports, other), posted to the Asana board |
-| **reportFake** | Legacy fake-report submissions (old app versions), triage, archiving, and Bluesky bot feed |
+| **reportFake** | Legacy fake-report submissions and status polling (old app versions) |
 | **notifications** | Device registration, push notification scheduling (Django-Q), and webhooks for new posts |
 | **payment** | Stripe payment intents |
 | **proxycache** | Social-media feed proxies (Instagram, Bluesky, TikTok, YouTube) and Plausible analytics proxy; caches responses |
@@ -22,9 +22,6 @@ Django backend server for the Volksverpetzer and Mimikama mobile apps.
 | `POST` | `/googleFact` | factApi | Google Fact Check search |
 | `POST` | `/contact` | contact | Submit a contact request (creates an Asana task) |
 | `POST` | `/reportFake` | reportFake | Submit a fake-report (legacy, old app versions) |
-| `POST` | `/triageFake` | reportFake | Triage a report |
-| `POST` | `/archiveFake` | reportFake | Archive a report |
-| `POST` | `/assign-bluesky` | reportFake | Assign Bluesky post to report |
 | `GET` | `/statusFake/<uuid>` | reportFake | Check report status |
 | `POST` | `/register` | notifications | Register device for push notifications |
 | `POST` | `/webhook_new_post` | notifications | Trigger push notifications for a new post |
@@ -158,9 +155,8 @@ The container starts both `gunicorn` (port 8080) and `qcluster` via the `CMD` in
 
 ## CI/CD
 
-Two GitHub Actions workflows are defined in `.github/workflows/`:
+One GitHub Actions workflow is defined in `.github/workflows/`:
 
 | Workflow | Trigger | What it does |
 |----------|---------|--------------|
-| `test-and-release.yml` | Push to any branch | Runs the Django test suite against a PostgreSQL service container |
-| `build-mimikama.yml` | Push to `mimikama` branch | Builds and deploys the app to Azure App Service (`mimikamaserver`) |
+| `test-and-deploy.yml` | Push to any branch | Runs the Django test suite; on `main` also deploys the image to the production **and Mimikama** Scaleway containers (needs the `SCALEWAY_MIMIKAMA_SERVICE_ID` secret), on `prerelease` to staging |

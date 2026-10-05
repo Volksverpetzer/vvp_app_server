@@ -1,3 +1,19 @@
+# [1.7.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.6.2...v1.7.0) (2026-10-05)
+
+
+### Features
+
+* **Deploy** — the Mimikama server now runs as its own Scaleway container (own database, since `NotificationDevice` has no per-app column) and is updated together with production on every `main` deploy, so it can't drift behind like the Azure deployment did. A preflight step fails the deploy before any container is touched if a service-ID secret is missing, and `cancel-in-progress` is now off so a run can't be cancelled between the production and Mimikama updates ([#66](https://github.com/Volksverpetzer/vvp_app_server/pull/66))
+
+
+### Chores
+
+* **Azure** — remove the Azure App Service deployment (`build-mimikama.yml`, built from a `mimikama` branch that no longer existed) and the Azure hosts from `ALLOWED_HOSTS` ([#66](https://github.com/Volksverpetzer/vvp_app_server/pull/66))
+* **Legacy fake reports** — remove the legacy fake-report triage UI ([#62](https://github.com/Volksverpetzer/vvp_app_server/pull/62))
+* **Admin** — use Django admin theme variables in the task and receipts monitor pages ([#65](https://github.com/Volksverpetzer/vvp_app_server/pull/65))
+* **Dependencies** — lock refresh within declared ranges, minimums raised for `cryptography`, `google-api-python-client`, `ruff` and `django-stubs` ([#66](https://github.com/Volksverpetzer/vvp_app_server/pull/66))
+
+
 # [1.6.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.5.0...v1.6.0) (2026-09-14)
 
 
