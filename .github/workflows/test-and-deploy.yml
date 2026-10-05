@@ -145,7 +145,7 @@ jobs:
 
       # Mimikama runs the same image as production (its own container + DB,
       # since NotificationDevice has no per-app column), deployed in lockstep
-      # so it can't drift behind like the old Azure `mimikama` branch did.
+      # so it can't drift behind like the old Azure deployment (separate branch) did.
       # Runs after the production PATCH: if production fails, Mimikama is
       # not touched.
       - name: 🚀 Deploy to Mimikama
