@@ -9,6 +9,12 @@ class NotificationDevice(models.Model):
     notification_new_fact_check = models.BooleanField(default=True)
     notification_new_pruefpunkt = models.BooleanField(default=False)
     date = models.DateTimeField(auto_now_add=True)
+    # Client metadata sent with every registration ("os" / "version" in the
+    # payload). Blank for devices that haven't re-registered since this landed.
+    # db_default keeps a DB-level default so inserts from code that predates
+    # these columns (old instances mid-deploy, a rollback) don't violate NOT NULL.
+    platform = models.CharField(max_length=50, default="", db_default="", blank=True)
+    app_build = models.CharField(max_length=50, default="", db_default="", blank=True)
 
     def __str__(self) -> str:
         return self.expo_token
