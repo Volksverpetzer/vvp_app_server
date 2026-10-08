@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -7,6 +8,9 @@ from exponent_server_sdk import PushClient  # type: ignore[reportMissingTypeStub
 from notifications.models import NotificationDevice
 
 logger = logging.getLogger(__name__)
+
+# Allowed client metadata values, e.g. "ios", "android", "2610081", "2.4.1".
+META_VALUE_RE = re.compile(r"[\w.+-]+")
 
 
 @csrf_exempt
@@ -72,9 +76,15 @@ def register(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"error": "invalid settings"}, status=400)
 
     def meta(key: str, max_length: int) -> str | None:
-        # None (key absent or not a string) leaves the stored value untouched.
+        # None leaves the stored value untouched: the key is absent, not a
+        # string, empty, or holds characters outside a plain identifier set
+        # (e.g. NUL or lone surrogates, which Postgres can't store and would
+        # otherwise fail the whole registration).
         value = data.get(key)
-        return value.strip()[:max_length] if isinstance(value, str) else None
+        if not isinstance(value, str):
+            return None
+        value = value.strip()[:max_length]
+        return value if META_VALUE_RE.fullmatch(value) else None
 
     platform = meta("os", 50)
     app_build = meta("version", 50)
