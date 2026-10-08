@@ -18,7 +18,8 @@ def register(request: HttpRequest) -> JsonResponse:
             contains two keys: "expo_token" and "settings". "settings" is a
             dictionary with the keys "new_post", "new_fact_check" and the
             optional "new_pruefpunkt". Each of these is a dictionary with one
-            key: "value".
+            key: "value". Optional: "os" (stored as platform) and "version"
+            (the native build number, stored as app_build).
 
     Returns:
         JsonResponse:
@@ -70,12 +71,24 @@ def register(request: HttpRequest) -> JsonResponse:
         logger.warning("Invalid settings payload: %s", e)
         return JsonResponse({"error": "invalid settings"}, status=400)
 
+    def meta(key: str, max_length: int) -> str | None:
+        # None (key absent or not a string) leaves the stored value untouched.
+        value = data.get(key)
+        return value.strip()[:max_length] if isinstance(value, str) else None
+
+    platform = meta("os", 50)
+    app_build = meta("version", 50)
+
     try:
         device, created = NotificationDevice.objects.get_or_create(expo_token=token)
         device.notification_new_post = new_post
         device.notification_new_fact_check = new_fact_check
         if new_pruefpunkt is not None:
             device.notification_new_pruefpunkt = new_pruefpunkt
+        if platform is not None:
+            device.platform = platform
+        if app_build is not None:
+            device.app_build = app_build
         device.save()
     except Exception as e:
         logger.exception("Failed to save NotificationDevice: %s", e)

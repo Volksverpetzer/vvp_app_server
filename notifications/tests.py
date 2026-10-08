@@ -302,6 +302,54 @@ class TestNotification(TestCase):
         )
         self.assertFalse(device.notification_new_pruefpunkt)
 
+    def test_register_stores_platform_and_build(self):
+        response = self.c.post(
+            "/register",
+            {
+                "expo_token": "ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]",
+                "settings": {
+                    "new_post": {"value": True},
+                    "new_fact_check": {"value": True},
+                },
+                "os": "ios",
+                "version": "2610081",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        device = NotificationDevice.objects.get(
+            expo_token="ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]"
+        )
+        self.assertEqual(device.platform, "ios")
+        self.assertEqual(device.app_build, "2610081")
+
+    def test_register_without_metadata_keeps_stored_values(self):
+        # A null "version" (nativeBuildVersion unavailable) or a missing "os"
+        # must not wipe what an earlier registration stored.
+        NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]",
+            platform="android",
+            app_build="2610081",
+        )
+        response = self.c.post(
+            "/register",
+            {
+                "expo_token": "ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]",
+                "settings": {
+                    "new_post": {"value": True},
+                    "new_fact_check": {"value": True},
+                },
+                "version": None,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        device = NotificationDevice.objects.get(
+            expo_token="ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]"
+        )
+        self.assertEqual(device.platform, "android")
+        self.assertEqual(device.app_build, "2610081")
+
     def test_register_malformed_settings_returns_400(self):
         # Missing new_fact_check and a non-dict new_post: a client-side payload
         # error, so it must be a 400 rather than a masked 500.
