@@ -12,7 +12,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django_q.tasks import (  # type: ignore[reportMissingTypeStubs]
     async_task,
-    delete_group,
     queue_size,
 )
 
@@ -160,7 +159,6 @@ def webhook_new_post(request: HttpRequest):
         qs = qs.filter(notification_new_post=True)
         channel_id = "new_post"
     logger.debug("Queue size: %s", queue_size())
-    delete_group("notifications")
     paginator = Paginator(qs, 100)
     for page in paginator.page_range:
         devices = paginator.page(page).object_list
