@@ -283,6 +283,23 @@ class TestNotification(TestCase):
         )
         self.assertTrue(device.notification_new_pruefpunkt)
 
+    def test_register_updates_last_seen(self):
+        payload = {
+            "expo_token": "ExponentPushToken[4LS0LwHjgUatWcx6H22e0g]",
+            "settings": {
+                "new_post": {"value": True},
+                "new_fact_check": {"value": True},
+            },
+        }
+        self.c.post("/register", payload, content_type="application/json")
+        device = NotificationDevice.objects.get(expo_token=payload["expo_token"])
+        first_seen = device.last_seen
+        self.assertIsNotNone(first_seen)
+
+        self.c.post("/register", payload, content_type="application/json")
+        device.refresh_from_db()
+        self.assertGreater(device.last_seen, first_seen)
+
     def test_register_without_pruefpunkt_keeps_default(self):
         # Older app versions omit new_pruefpunkt; field stays at its default.
         response = self.c.post(
@@ -1063,7 +1080,7 @@ class CheckReceiptsTest(TestCase):
     def test_check_receipts_returns_errors(self, mock_build):
         ok = MagicMock(status="ok")
         err = MagicMock(status="error")
-        mock_build.return_value.check_receipts.return_value = [ok, err]
+        mock_build.return_value.check_receipts_multiple.return_value = [ok, err]
         from notifications.helper import check_receipts
 
         errors = check_receipts([])
@@ -1072,7 +1089,7 @@ class CheckReceiptsTest(TestCase):
 
     @patch("notifications.helper._build_push_client")
     def test_check_receipts_empty_returns_empty_list(self, mock_build):
-        mock_build.return_value.check_receipts.return_value = []
+        mock_build.return_value.check_receipts_multiple.return_value = []
         from notifications.helper import check_receipts
 
         errors = check_receipts([])
@@ -1082,13 +1099,94 @@ class CheckReceiptsTest(TestCase):
     def test_check_receipts_push_server_error_reraised(self, mock_build):
         from exponent_server_sdk import PushServerError
 
-        mock_build.return_value.check_receipts.side_effect = PushServerError(
+        mock_build.return_value.check_receipts_multiple.side_effect = PushServerError(
             MagicMock(), MagicMock(), errors=[], response_data={}
         )
         from notifications.helper import check_receipts
 
         with self.assertRaises(PushServerError):
             check_receipts([])
+
+
+class ProcessReceiptsTest(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        self.dead = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[receipts-dead]"
+        )
+        self.alive = NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[receipts-alive]"
+        )
+        sent = timezone.now() - timedelta(minutes=30)
+        for log_id, device in (("t-dead", self.dead), ("t-alive", self.alive)):
+            PushMessageLog.objects.create(
+                id=log_id, to=device, title="t", body="b", data={}
+            )
+        # auto_now_add ignores values passed to create().
+        PushMessageLog.objects.update(date=sent)
+
+    def _receipt(self, receipt_id, status="ok", error=None):
+        from exponent_server_sdk import PushReceipt
+
+        details = {"error": error} if error else None
+        return PushReceipt(id=receipt_id, status=status, message="", details=details)
+
+    @patch("notifications.helper._build_push_client")
+    def test_deletes_device_not_registered(self, mock_build):
+        mock_build.return_value.check_receipts_multiple.return_value = [
+            self._receipt("t-dead", "error", "DeviceNotRegistered"),
+            self._receipt("t-alive"),
+        ]
+        from notifications.helper import process_receipts
+
+        self.assertEqual(process_receipts(), 1)
+        self.assertFalse(NotificationDevice.objects.filter(pk=self.dead.pk).exists())
+        self.assertTrue(NotificationDevice.objects.filter(pk=self.alive.pk).exists())
+        self.assertTrue(PushMessageLog.objects.get(id="t-alive").checked)
+
+    @patch("notifications.helper._build_push_client")
+    def test_other_errors_keep_device(self, mock_build):
+        mock_build.return_value.check_receipts_multiple.return_value = [
+            self._receipt("t-dead", "error", "MessageRateExceeded"),
+        ]
+        from notifications.helper import process_receipts
+
+        self.assertEqual(process_receipts(), 0)
+        self.assertTrue(NotificationDevice.objects.filter(pk=self.dead.pk).exists())
+        self.assertTrue(PushMessageLog.objects.get(id="t-dead").checked)
+        # No receipt yet for t-alive: stays pending for the next run.
+        self.assertFalse(PushMessageLog.objects.get(id="t-alive").checked)
+
+    @patch("notifications.helper._build_push_client")
+    def test_skips_too_recent_too_old_and_checked(self, mock_build):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        PushMessageLog.objects.filter(id="t-dead").update(date=timezone.now())
+        PushMessageLog.objects.filter(id="t-alive").update(
+            date=timezone.now() - timedelta(days=2)
+        )
+        from notifications.helper import process_receipts
+
+        self.assertEqual(process_receipts(), 0)
+        mock_build.return_value.check_receipts_multiple.assert_not_called()
+
+        PushMessageLog.objects.update(
+            date=timezone.now() - timedelta(minutes=30), checked=True
+        )
+        self.assertEqual(process_receipts(), 0)
+        mock_build.return_value.check_receipts_multiple.assert_not_called()
+
+    def test_hourly_schedule_exists(self):
+        from django_q.models import Schedule  # type: ignore[reportMissingTypeStubs]
+
+        schedule = Schedule.objects.get(name="process_push_receipts")
+        self.assertEqual(schedule.func, "notifications.helper.process_receipts")
+        self.assertEqual(schedule.schedule_type, Schedule.HOURLY)
 
 
 class TaskMonitorViewTest(TestCase):

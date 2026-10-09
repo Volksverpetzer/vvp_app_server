@@ -15,6 +15,10 @@ class NotificationDevice(models.Model):
     # these columns (old instances mid-deploy, a rollback) don't violate NOT NULL.
     platform = models.CharField(max_length=50, default="", db_default="", blank=True)
     app_build = models.CharField(max_length=50, default="", db_default="", blank=True)
+    # Updated on every /register call, which the app makes on each launch while
+    # notifications are allowed, so this is effectively the last app open.
+    # Null for devices that haven't registered since this landed.
+    last_seen = models.DateTimeField(null=True, blank=True)
 
     def __str__(self) -> str:
         return self.expo_token

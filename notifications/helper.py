@@ -1,6 +1,7 @@
 import logging
 import os
 import time
+from datetime import timedelta
 from typing import Iterable
 
 import requests
@@ -8,9 +9,11 @@ from exponent_server_sdk import (  # type: ignore[reportUnknownParameterType]
     DeviceNotRegisteredError,
     PushClient,
     PushMessage,
+    PushReceipt,
     PushServerError,
     PushTicketError,
 )
+from django.utils import timezone
 from requests.exceptions import ConnectionError, HTTPError
 
 from .models import NotificationDevice, PushMessageLog
@@ -206,7 +209,10 @@ def send_push_message(
 def check_receipts(responses: Iterable[PushMessage]):
     client = _build_push_client()
     try:
-        receipts = client.check_receipts(responses)
+        # check_receipts_multiple, not check_receipts: the latter posts with a
+        # bare requests.post, bypassing the client's session and with it the
+        # Authorization header that enhanced push security requires.
+        receipts = client.check_receipts_multiple(list(responses))
         logger.debug("Received %d receipts", len(receipts))
         if not receipts:
             return []
@@ -226,3 +232,59 @@ def check_receipts(responses: Iterable[PushMessage]):
     except Exception as exc:
         logger.exception("Unexpected error in check_receipts: %s", exc)
         raise
+
+
+# Expo needs a few minutes to produce receipts and keeps them for about a day,
+# so only messages in that window are checked. Messages without a receipt yet
+# stay unchecked and are picked up by the next run.
+RECEIPT_MIN_AGE = timedelta(minutes=15)
+RECEIPT_MAX_AGE = timedelta(days=1)
+
+
+def process_receipts() -> int:
+    """Check pending push receipts and delete devices Expo reports as
+    DeviceNotRegistered (app uninstalled, token invalidated).
+
+    Runs on an hourly django-q schedule (migration 0008). A device that is
+    still in use re-registers on its next app launch, so deleting one is safe.
+
+    Returns:
+        int: number of deleted devices
+    """
+    now = timezone.now()
+    logs = list(
+        PushMessageLog.objects.filter(
+            checked=False,
+            date__lte=now - RECEIPT_MIN_AGE,
+            date__gt=now - RECEIPT_MAX_AGE,
+        )
+    )
+    if not logs:
+        return 0
+
+    # check_receipts_multiple splits the IDs into requests of 1000, Expo's
+    # getReceipts limit, and returns the combined receipts.
+    receipts = _build_push_client().check_receipts_multiple(logs)
+    device_by_log = {log.id: log.to_id for log in logs}
+    unregistered: set[int] = set()
+    for receipt in receipts:
+        if receipt.is_success():
+            continue
+        details = receipt.details if isinstance(receipt.details, dict) else {}
+        if details.get("error") == PushReceipt.ERROR_DEVICE_NOT_REGISTERED:
+            device_id = device_by_log.get(receipt.id)
+            if device_id is not None:
+                unregistered.add(device_id)
+        else:
+            logger.error("Receipt error: %s", receipt)
+
+    # Mark before deleting: the delete cascades to the device's log rows.
+    PushMessageLog.objects.filter(id__in=[r.id for r in receipts]).update(checked=True)
+    NotificationDevice.objects.filter(id__in=unregistered).delete()
+    logger.info(
+        "process_receipts: %d message(s), %d receipt(s), %d unregistered",
+        len(logs),
+        len(receipts),
+        len(unregistered),
+    )
+    return len(unregistered)
