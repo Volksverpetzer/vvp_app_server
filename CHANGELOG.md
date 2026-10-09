@@ -1,3 +1,12 @@
+# [1.7.3](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.2...v1.7.3) (2026-10-09)
+
+
+### Chores
+
+* **Crawlers** — serve a `robots.txt` that disallows all crawlers. The domain only serves the app's API, and crawlers were following the signed `/proxy/media_url` links embedded on volksverpetzer.de with mangled query strings, filling the logs with 400s ([#77](https://github.com/Volksverpetzer/vvp_app_server/pull/77))
+* **Notifications** — remove the no-op `delete_group("notifications")` call from the new-post webhook. It only cleared the group label on finished task records and never cancelled queued batches, despite reading as if it did ([#76](https://github.com/Volksverpetzer/vvp_app_server/pull/76))
+
+
 # [1.7.2](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.1...v1.7.2) (2026-10-09)
 
 
