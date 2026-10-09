@@ -929,7 +929,7 @@ class SendPushMessageTest(TestCase):
         )
         mock_sleep.assert_called_once_with(15)
 
-    @patch.dict(os.environ, {"EXPO_TOKEN": "test-expo-token"})  # nosec
+    @patch.dict(os.environ, {"EXPO_PUSH_ACCESS_TOKEN": "test-expo-token"})  # nosec
     def test_build_push_client_with_token(self):
         from notifications.helper import _build_push_client
 
