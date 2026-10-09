@@ -16,6 +16,7 @@ class NotificationDeviceAdmin(admin.ModelAdmin):
         "notification_new_fact_check",
         "notification_new_pruefpunkt",
         "date",
+        "last_seen",
     )
     list_filter = (
         "platform",
@@ -23,6 +24,7 @@ class NotificationDeviceAdmin(admin.ModelAdmin):
         "notification_new_post",
         "notification_new_fact_check",
         "notification_new_pruefpunkt",
+        "last_seen",
     )
     # Facet counts next to each filter option give the per-platform/-build
     # device numbers without a separate report.

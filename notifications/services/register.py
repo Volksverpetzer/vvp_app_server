@@ -3,6 +3,7 @@ import logging
 import re
 
 from django.http import HttpRequest, JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from exponent_server_sdk import PushClient  # type: ignore[reportMissingTypeStubs]
 from notifications.models import NotificationDevice
@@ -99,6 +100,7 @@ def register(request: HttpRequest) -> JsonResponse:
             device.platform = platform
         if app_build is not None:
             device.app_build = app_build
+        device.last_seen = timezone.now()
         device.save()
     except Exception as e:
         logger.exception("Failed to save NotificationDevice: %s", e)
