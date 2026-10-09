@@ -39,7 +39,7 @@ class ImagePushMessage(PushMessage):
 
 
 def _build_push_client() -> PushClient:
-    expo_token = os.getenv("EXPO_TOKEN")
+    expo_token = os.getenv("EXPO_PUSH_ACCESS_TOKEN")
     if not expo_token:
         return PushClient()
     session = requests.Session()
