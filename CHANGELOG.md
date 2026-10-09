@@ -1,3 +1,17 @@
+# [1.7.1](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.0...v1.7.1) (2026-10-09)
+
+
+### Features
+
+* **Notifications** — store the platform (`os`) and native build number (`version`) that the app already sends with every `/register` call as `platform` / `app_build` on `NotificationDevice`; the server previously dropped both. The new columns have a database-level default, so old instances still serving during a deploy (or after a rollback) can keep inserting devices, and empty or malformed values are ignored instead of wiping stored data or failing the registration. Existing devices fill in on their next registration ([#69](https://github.com/Volksverpetzer/vvp_app_server/pull/69))
+* **Admin** — view-only Django admin for notification devices: list, search by token, and filter by platform, build and notification settings, with per-option counts ([#70](https://github.com/Volksverpetzer/vvp_app_server/pull/70))
+
+
+### Chores
+
+* **Dependencies** — lock refresh within declared ranges (`django` 6.1.2, `djangorestframework` 3.18.3, `pydantic` 2.14.0, `shapely` 2.2.0, `google-api-core`, `google-auth` and others); `stripe` 16 is left out as a major bump
+
+
 # [1.7.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.6.2...v1.7.0) (2026-10-05)
 
 
