@@ -1115,3 +1115,43 @@ class ReceiptsMonitorViewTest(TestCase):
         self.client.logout()
         response = self.client.get("/receipts_monitor")
         self.assertEqual(response.status_code, 302)
+
+
+class NotificationDeviceAdminTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(
+            username="admin",
+            password="pw",  # nosec
+        )
+        self.client.force_login(self.user)
+        NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[adminIosAAAAAAAAAAAAA]",
+            platform="ios",
+            app_build="2610081",
+        )
+        NotificationDevice.objects.create(
+            expo_token="ExponentPushToken[adminAndroidAAAAAAAAA]",
+            platform="android",
+        )
+
+    def test_changelist_filters_by_platform(self):
+        url = "/admin/notifications/notificationdevice/"
+        response = self.client.get(url, {"platform": "ios"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "ExponentPushToken[adminIosAAAAAAAAAAAAA]")
+        self.assertNotContains(response, "ExponentPushToken[adminAndroidAAAAAAAAA]")
+
+    def test_admin_is_view_only(self):
+        device = NotificationDevice.objects.get(platform="ios")
+        base = "/admin/notifications/notificationdevice/"
+        self.assertEqual(self.client.get(f"{base}add/").status_code, 403)
+        self.assertEqual(self.client.get(f"{base}{device.pk}/delete/").status_code, 403)
+        # The change page renders read-only rather than 403 (view permission).
+        response = self.client.get(f"{base}{device.pk}/change/")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'name="_save"')
+
+    def test_changelist_requires_login(self):
+        self.client.logout()
+        response = self.client.get("/admin/notifications/notificationdevice/")
+        self.assertEqual(response.status_code, 302)
