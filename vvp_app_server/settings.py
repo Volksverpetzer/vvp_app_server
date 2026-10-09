@@ -322,3 +322,9 @@ LOGGING = {
         },
     },
 }
+
+# Error tracking (self-hosted GlitchTip). No-op unless GLITCHTIP_DSN is set.
+from vvp_app_server import __version__  # noqa: E402
+from vvp_app_server.error_tracking import init_error_tracking  # noqa: E402
+
+init_error_tracking(os.getenv("GLITCHTIP_DSN"), __version__)
