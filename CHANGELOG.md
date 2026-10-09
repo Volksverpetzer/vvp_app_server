@@ -1,3 +1,11 @@
+# [1.7.2](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.1...v1.7.2) (2026-10-09)
+
+
+### Chores
+
+* **Notifications** — rename the Expo push API access token variable from `EXPO_TOKEN` to `EXPO_PUSH_ACCESS_TOKEN`, so it no longer shares a name with the EAS CLI token in the app's CI. The old name is no longer read: set `EXPO_PUSH_ACCESS_TOKEN` on the production and Mimikama containers before deploying, because without it the server silently sends unauthenticated pushes. The token test now checks the `Authorization` header instead of only that a client was built ([#73](https://github.com/Volksverpetzer/vvp_app_server/pull/73))
+
+
 # [1.7.1](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.0...v1.7.1) (2026-10-09)
 
 
