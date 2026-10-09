@@ -1,3 +1,17 @@
+# [1.7.4](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.3...v1.7.4) (2026-10-09)
+
+
+### Features
+
+* **Notifications** — delete devices that Expo reports as `DeviceNotRegistered` in a push receipt (app uninstalled, token invalidated). An hourly django-q schedule (`process_push_receipts`, created by migration `0008`) checks receipts for pushes sent 15 minutes to 24 hours ago; other receipt errors are only logged. Previously only ticket-level errors removed devices, so uninstalled apps kept a slot in every push batch. The `check_receipts` management command now does the same ([#80](https://github.com/Volksverpetzer/vvp_app_server/pull/80))
+* **Notifications** — store `last_seen` on `NotificationDevice`, updated on every `/register` call (each app launch while notifications are allowed), and show and filter it in the device admin. Existing devices fill in on their next launch; it is not used for pruning ([#80](https://github.com/Volksverpetzer/vvp_app_server/pull/80))
+
+
+### Bug Fixes
+
+* **Notifications** — receipt checks now send the `EXPO_PUSH_ACCESS_TOKEN`: the SDK's `check_receipts` posted without the client session and its `Authorization` header, so it is replaced by `check_receipts_multiple`, which also batches IDs in groups of 1000 ([#80](https://github.com/Volksverpetzer/vvp_app_server/pull/80))
+
+
 # [1.7.3](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.2...v1.7.3) (2026-10-09)
 
 
