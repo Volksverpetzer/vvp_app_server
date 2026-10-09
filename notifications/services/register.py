@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -7,6 +8,9 @@ from exponent_server_sdk import PushClient  # type: ignore[reportMissingTypeStub
 from notifications.models import NotificationDevice
 
 logger = logging.getLogger(__name__)
+
+# Allowed client metadata values, e.g. "ios", "android", "2610081", "2.4.1".
+META_VALUE_RE = re.compile(r"[\w.+-]+")
 
 
 @csrf_exempt
@@ -18,7 +22,8 @@ def register(request: HttpRequest) -> JsonResponse:
             contains two keys: "expo_token" and "settings". "settings" is a
             dictionary with the keys "new_post", "new_fact_check" and the
             optional "new_pruefpunkt". Each of these is a dictionary with one
-            key: "value".
+            key: "value". Optional: "os" (stored as platform) and "version"
+            (the native build number, stored as app_build).
 
     Returns:
         JsonResponse:
@@ -70,12 +75,30 @@ def register(request: HttpRequest) -> JsonResponse:
         logger.warning("Invalid settings payload: %s", e)
         return JsonResponse({"error": "invalid settings"}, status=400)
 
+    def meta(key: str, max_length: int) -> str | None:
+        # None leaves the stored value untouched: the key is absent, not a
+        # string, empty, or holds characters outside a plain identifier set
+        # (e.g. NUL or lone surrogates, which Postgres can't store and would
+        # otherwise fail the whole registration).
+        value = data.get(key)
+        if not isinstance(value, str):
+            return None
+        value = value.strip()[:max_length]
+        return value if META_VALUE_RE.fullmatch(value) else None
+
+    platform = meta("os", 50)
+    app_build = meta("version", 50)
+
     try:
         device, created = NotificationDevice.objects.get_or_create(expo_token=token)
         device.notification_new_post = new_post
         device.notification_new_fact_check = new_fact_check
         if new_pruefpunkt is not None:
             device.notification_new_pruefpunkt = new_pruefpunkt
+        if platform is not None:
+            device.platform = platform
+        if app_build is not None:
+            device.app_build = app_build
         device.save()
     except Exception as e:
         logger.exception("Failed to save NotificationDevice: %s", e)
