@@ -37,3 +37,11 @@ class InfoTestCase(TestCase):
             response = self.client.get("/info")
         data = json.loads(response.content)
         self.assertEqual(data["env"], "production")
+
+
+class RobotsTxtTestCase(TestCase):
+    def test_robots_txt_disallows_all_crawlers(self):
+        response = self.client.get("/robots.txt")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/plain")
+        self.assertEqual(response.content.decode(), "User-agent: *\nDisallow: /\n")
