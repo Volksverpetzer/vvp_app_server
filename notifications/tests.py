@@ -934,7 +934,17 @@ class SendPushMessageTest(TestCase):
         from notifications.helper import _build_push_client
 
         client = _build_push_client()
-        self.assertIsNotNone(client)
+        self.assertEqual(
+            client.session.headers.get("Authorization"), "Bearer test-expo-token"
+        )
+
+    @patch.dict(os.environ, {"EXPO_TOKEN": "old-expo-token"})  # nosec
+    def test_build_push_client_ignores_legacy_token_name(self):
+        from notifications.helper import _build_push_client
+
+        os.environ.pop("EXPO_PUSH_ACCESS_TOKEN", None)
+        client = _build_push_client()
+        self.assertNotIn("Authorization", client.session.headers)
 
     @patch("notifications.helper._build_push_client")
     def test_push_server_error_is_reraised(self, mock_build):
