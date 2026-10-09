@@ -262,6 +262,8 @@ def process_receipts() -> int:
     if not logs:
         return 0
 
+    # check_receipts_multiple splits the IDs into requests of 1000, Expo's
+    # getReceipts limit, and returns the combined receipts.
     receipts = _build_push_client().check_receipts_multiple(logs)
     device_by_log = {log.id: log.to_id for log in logs}
     unregistered: set[int] = set()
