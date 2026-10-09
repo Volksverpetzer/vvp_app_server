@@ -1,3 +1,17 @@
+# [1.7.4](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.3...v1.7.4) (2026-10-09)
+
+
+### Features
+
+* **Notifications** — delete devices that Expo reports as `DeviceNotRegistered` in a push receipt (app uninstalled, token invalidated). An hourly django-q schedule (`process_push_receipts`, created by migration `0008`) checks receipts for pushes sent 15 minutes to 24 hours ago; other receipt errors are only logged. Previously only ticket-level errors removed devices, so uninstalled apps kept a slot in every push batch. The `check_receipts` management command now does the same ([#80](https://github.com/Volksverpetzer/vvp_app_server/pull/80))
+* **Notifications** — store `last_seen` on `NotificationDevice`, updated on every `/register` call (each app launch while notifications are allowed), and show and filter it in the device admin. Existing devices fill in on their next launch; it is not used for pruning ([#80](https://github.com/Volksverpetzer/vvp_app_server/pull/80))
+
+
+### Bug Fixes
+
+* **Notifications** — receipt checks now send the `EXPO_PUSH_ACCESS_TOKEN`: the SDK's `check_receipts` posted without the client session and its `Authorization` header, so it is replaced by `check_receipts_multiple`, which also batches IDs in groups of 1000 ([#80](https://github.com/Volksverpetzer/vvp_app_server/pull/80))
+
+
 # [1.7.3](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.2...v1.7.3) (2026-10-09)
 
 
@@ -26,7 +40,7 @@
 
 ### Chores
 
-* **Dependencies** — lock refresh within declared ranges (`django` 6.1.2, `djangorestframework` 3.18.3, `pydantic` 2.14.0, `shapely` 2.2.0, `google-api-core`, `google-auth` and others); `stripe` 16 is left out as a major bump
+* **Dependencies** — lock refresh within declared ranges (`django` 6.1.2, `djangorestframework` 3.18.3, `pydantic` 2.14.0, `shapely` 2.2.0, `google-api-core`, `google-auth` and others); `stripe` 16 is left out as a major bump ([#71](https://github.com/Volksverpetzer/vvp_app_server/pull/71))
 
 
 # [1.7.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.6.2...v1.7.0) (2026-10-05)
@@ -43,6 +57,39 @@
 * **Legacy fake reports** — remove the legacy fake-report triage UI ([#62](https://github.com/Volksverpetzer/vvp_app_server/pull/62))
 * **Admin** — use Django admin theme variables in the task and receipts monitor pages ([#65](https://github.com/Volksverpetzer/vvp_app_server/pull/65))
 * **Dependencies** — lock refresh within declared ranges, minimums raised for `cryptography`, `google-api-python-client`, `ruff` and `django-stubs` ([#66](https://github.com/Volksverpetzer/vvp_app_server/pull/66))
+
+
+# [1.6.2](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.6.1...v1.6.2) (2026-09-29)
+
+
+### Features
+
+* **Notifications** — send an Android `channelId` per push type (`new_pruefpunkt` for Prüfpunkt posts, `new_fact_check` for Volksverpetzer fact-checks, `new_post` otherwise), so Android files pushes under the app's per-type channels instead of the generic "Miscellaneous" fallback ([#58](https://github.com/Volksverpetzer/vvp_app_server/pull/58))
+* **Mimikama** — support the Mimikama deployment on Scaleway: allow `mimikama.volksverpetzer-app.de`, add `mimikama.org` to the new-post webhook (posts titled "Mimikama | Beitrag" and sent to all `new_post` devices, since Mimikama has a single article switch), and add the `mimikama_org` Instagram feed account ([#59](https://github.com/Volksverpetzer/vvp_app_server/pull/59))
+
+
+### Bug Fixes
+
+* **Notifications** — `extra` no longer overwrites the canonical `image` stored in `PushMessageLog.data` ([#58](https://github.com/Volksverpetzer/vvp_app_server/pull/58))
+
+
+### Chores
+
+* **Tests** — cover the image comparison in the push-message dedup ([#60](https://github.com/Volksverpetzer/vvp_app_server/pull/60))
+
+
+# [1.6.1](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.6.0...v1.6.1) (2026-09-25)
+
+
+### Features
+
+* **YouTube** — include video statistics (view counts) in the `ytAPI` proxy, for the view-count badge on the app's YouTube feed cards ([#53](https://github.com/Volksverpetzer/vvp_app_server/pull/53))
+* **Notifications** — log the fetched `og_image` for every new-post webhook and warn when a re-fired webhook is deduped while carrying a different image, to diagnose pushes arriving without their image ([#55](https://github.com/Volksverpetzer/vvp_app_server/pull/55))
+
+
+### Chores
+
+* **Dependencies** — lock refresh within declared ranges, and removal of unused dependencies (`llama-index` and its plugins, `openai`, `pinecone`, `Mastodon.py`, `markdown2`, `postgres`) ([#52](https://github.com/Volksverpetzer/vvp_app_server/pull/52))
 
 
 # [1.6.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.5.0...v1.6.0) (2026-09-14)
