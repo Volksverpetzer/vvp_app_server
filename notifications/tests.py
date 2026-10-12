@@ -1252,9 +1252,11 @@ class NotificationDeviceAdminTest(TestCase):
     def test_empty_filter_values_are_labelled_unknown(self):
         response = self.client.get("/admin/notifications/notificationdevice/")
         self.assertEqual(response.status_code, 200)
-        # The Android device has no app_build, the iOS one has both values.
-        self.assertContains(response, "unknown (1)")
-        self.assertNotContains(response, ">unknown (0)<")
+        # Only the build filter gets an "unknown" option: the Android device
+        # has no app_build, but both devices have a platform. Django renders
+        # the facet count inline in the option's link text.
+        self.assertContains(response, ">unknown (1)</a>", count=1)
+        self.assertContains(response, ">unknown", count=1)
         response = self.client.get(
             "/admin/notifications/notificationdevice/", {"app_build": ""}
         )
