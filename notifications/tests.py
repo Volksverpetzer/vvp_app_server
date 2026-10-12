@@ -1249,6 +1249,18 @@ class NotificationDeviceAdminTest(TestCase):
         self.assertContains(response, "ExponentPushToken[adminIosAAAAAAAAAAAAA]")
         self.assertNotContains(response, "ExponentPushToken[adminAndroidAAAAAAAAA]")
 
+    def test_empty_filter_values_are_labelled_unknown(self):
+        response = self.client.get("/admin/notifications/notificationdevice/")
+        self.assertEqual(response.status_code, 200)
+        # The Android device has no app_build, the iOS one has both values.
+        self.assertContains(response, "unknown (1)")
+        self.assertNotContains(response, ">unknown (0)<")
+        response = self.client.get(
+            "/admin/notifications/notificationdevice/", {"app_build": ""}
+        )
+        self.assertContains(response, "ExponentPushToken[adminAndroidAAAAAAAAA]")
+        self.assertNotContains(response, "ExponentPushToken[adminIosAAAAAAAAAAAAA]")
+
     def test_admin_is_view_only(self):
         device = NotificationDevice.objects.get(platform="ios")
         base = "/admin/notifications/notificationdevice/"
