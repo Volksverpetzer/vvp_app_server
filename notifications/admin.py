@@ -3,6 +3,21 @@ from django.contrib import admin
 from notifications.models import NotificationDevice
 
 
+class UnknownLabelValuesFilter(admin.AllValuesFieldListFilter):
+    """Label the "" option "unknown": devices that have not re-registered
+    since platform/app_build were added have empty values, which Django
+    would otherwise list as a nameless option."""
+
+    def choices(self, changelist):
+        for choice in super().choices(changelist):
+            # The empty value displays as "", or as " (n)" with facets.
+            if choice["query_string"] == changelist.get_query_string(
+                {self.lookup_kwarg: ""}, [self.lookup_kwarg_isnull]
+            ):
+                choice["display"] = f"unknown{choice['display']}"
+            yield choice
+
+
 @admin.register(NotificationDevice)
 class NotificationDeviceAdmin(admin.ModelAdmin):
     """Inspect registered push devices, e.g. how many are on each platform or
@@ -19,8 +34,8 @@ class NotificationDeviceAdmin(admin.ModelAdmin):
         "last_seen",
     )
     list_filter = (
-        "platform",
-        "app_build",
+        ("platform", UnknownLabelValuesFilter),
+        ("app_build", UnknownLabelValuesFilter),
         "notification_new_post",
         "notification_new_fact_check",
         "notification_new_pruefpunkt",
