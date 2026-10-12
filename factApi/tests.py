@@ -29,6 +29,10 @@ class FactApiTestCase(TestCase):
                             "claimReview": [{"reviewDate": "2026-01-01"}],
                         },
                         {"text": "Claim without review"},
+                        {
+                            "text": "Claim with empty review date",
+                            "claimReview": [{"reviewDate": ""}],
+                        },
                     ]
                 }
             )
@@ -37,6 +41,6 @@ class FactApiTestCase(TestCase):
         # check if the response is 200 OK.
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_get.call_args.kwargs["params"]["query"], "corona,impfung")
-        # Claims without a review date are dropped.
+        # Claims without a review or with an empty review date are dropped.
         claims = response.json()["claims"]
         self.assertEqual([c["text"] for c in claims], ["Reviewed claim"])
