@@ -1181,6 +1181,30 @@ class ProcessReceiptsTest(TestCase):
         self.assertEqual(process_receipts(), 0)
         mock_build.return_value.check_receipts_multiple.assert_not_called()
 
+    @patch("notifications.helper._build_push_client")
+    def test_high_failure_rate_logs_error(self, mock_build):
+        # 12/60 = 20% failed receipts (> 10%); unregistered devices don't count.
+        receipts = [self._receipt(f"x{i}", "error", "MessageTooBig") for i in range(12)]
+        receipts += [self._receipt(f"y{i}") for i in range(48)]
+        receipts.append(self._receipt("t-dead", "error", "DeviceNotRegistered"))
+        mock_build.return_value.check_receipts_multiple.return_value = receipts
+        from notifications.helper import process_receipts
+
+        with self.assertLogs("notifications.helper", level="ERROR") as logs:
+            process_receipts()
+        self.assertTrue(any("High push receipt failure" in m for m in logs.output))
+
+    @patch("notifications.helper._build_push_client")
+    def test_low_failure_rate_does_not_alert(self, mock_build):
+        receipts = [self._receipt("x0", "error", "MessageTooBig")]
+        receipts += [self._receipt(f"y{i}") for i in range(59)]
+        mock_build.return_value.check_receipts_multiple.return_value = receipts
+        from notifications.helper import process_receipts
+
+        with self.assertLogs("notifications.helper", level="ERROR") as logs:
+            process_receipts()
+        self.assertFalse(any("High push receipt failure" in m for m in logs.output))
+
     def test_hourly_schedule_exists(self):
         from django_q.models import Schedule  # type: ignore[reportMissingTypeStubs]
 

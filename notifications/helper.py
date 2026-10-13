@@ -239,6 +239,11 @@ def check_receipts(responses: Iterable[PushMessage]):
 # stay unchecked and are picked up by the next run.
 RECEIPT_MIN_AGE = timedelta(minutes=15)
 RECEIPT_MAX_AGE = timedelta(days=1)
+# Above this share of failed receipts (with enough receipts to be meaningful)
+# a run logs an ERROR, which error tracking turns into an alert. Unregistered
+# devices are normal churn and don't count as failures.
+RECEIPT_ALERT_RATE = 0.10
+RECEIPT_ALERT_MIN_COUNT = 50
 
 
 def process_receipts() -> int:
@@ -267,6 +272,7 @@ def process_receipts() -> int:
     receipts = _build_push_client().check_receipts_multiple(logs)
     device_by_log = {log.id: log.to_id for log in logs}
     unregistered: set[int] = set()
+    failed = 0
     for receipt in receipts:
         if receipt.is_success():
             continue
@@ -276,11 +282,21 @@ def process_receipts() -> int:
             if device_id is not None:
                 unregistered.add(device_id)
         else:
+            failed += 1
             logger.error("Receipt error: %s", receipt)
 
     # Mark before deleting: the delete cascades to the device's log rows.
     PushMessageLog.objects.filter(id__in=[r.id for r in receipts]).update(checked=True)
     NotificationDevice.objects.filter(id__in=unregistered).delete()
+    if (
+        len(receipts) >= RECEIPT_ALERT_MIN_COUNT
+        and failed / len(receipts) > RECEIPT_ALERT_RATE
+    ):
+        logger.error(
+            "High push receipt failure rate: %d/%d receipts failed",
+            failed,
+            len(receipts),
+        )
     logger.info(
         "process_receipts: %d message(s), %d receipt(s), %d unregistered",
         len(logs),
