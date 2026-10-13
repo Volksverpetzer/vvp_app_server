@@ -1,3 +1,11 @@
+# [1.7.6](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.5...v1.7.6) (2026-10-13)
+
+
+### Bug Fixes
+
+* **Notifications** — send a resized featured image (`medium_large`, falling back to `large`, then the `og:image`) in the push's `richContent.image`. Android drops notification images above roughly 1 MB when the app is closed or in the background, and full-size featured images are routinely 1.3-1.7 MB, so those pushes arrived without a picture; with the app in the foreground the app downloads the image itself, which is why it showed there. The resized URL is read from the featured media embedded in the existing post request (`_embed=wp:featuredmedia`), so the webhook makes no extra request ([#86](https://github.com/Volksverpetzer/vvp_app_server/pull/86))
+
+
 # [1.7.5](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.4...v1.7.5) (2026-10-13)
 
 
