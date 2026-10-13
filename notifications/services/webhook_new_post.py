@@ -41,6 +41,35 @@ SITES = {
 }
 
 
+# Android shows push images from the FCM payload when the app is closed or in
+# the background, and silently drops them above roughly 1 MB. The full-size
+# featured image is routinely 1.3-1.7 MB, so prefer a resized variant.
+PUSH_IMAGE_SIZES = ("medium_large", "large")
+
+
+def _resized_featured_image(post: dict) -> str | None:
+    """Return a push-friendly resized featured image URL, or None.
+
+    Reads the featured media embedded in the post response (`_embed`), so no
+    extra request is needed; callers fall back to the post's og:image.
+    """
+    embedded = post.get("_embedded")
+    media_list = (
+        embedded.get("wp:featuredmedia") if isinstance(embedded, dict) else None
+    )
+    media = media_list[0] if isinstance(media_list, list) and media_list else None
+    details = media.get("media_details") if isinstance(media, dict) else None
+    sizes = details.get("sizes") if isinstance(details, dict) else None
+    if not isinstance(sizes, dict):
+        return None
+    for name in PUSH_IMAGE_SIZES:
+        size = sizes.get(name)
+        url = size.get("source_url") if isinstance(size, dict) else None
+        if isinstance(url, str) and url:
+            return url
+    return None
+
+
 def _resolve_site(permalink: str) -> str:
     """Map a post permalink's domain to a configured site key.
 
@@ -97,7 +126,7 @@ def webhook_new_post(request: HttpRequest):
     try:
         response = requests.get(
             wpUrl + "/wp-json/wp/v2/posts/",
-            params={"slug": slug},
+            params={"slug": slug, "_embed": "wp:featuredmedia"},
             headers={"User-Agent": "VVP APP Server"},
             timeout=10,
         )
@@ -123,6 +152,7 @@ def webhook_new_post(request: HttpRequest):
         else None
     )
     image_url = image_url if isinstance(image_url, str) else None
+    image_url = _resized_featured_image(post) or image_url
     title_field = post.get("title")
     title = html.unescape(
         title_field.get("rendered", "") if isinstance(title_field, dict) else ""
