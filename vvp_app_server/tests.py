@@ -17,6 +17,10 @@ class EdgeCacheControlMiddlewareTests(SimpleTestCase):
         response = self._process(HttpResponseRedirect("/elsewhere/"))
         self.assertEqual(response["Cache-Control"], "no-store")
 
+    def test_not_modified_is_not_marked_no_store(self):
+        response = self._process(HttpResponse(status=304))
+        self.assertFalse(response.has_header("Cache-Control"))
+
     def test_manual_cache_control_is_kept(self):
         original = HttpResponseRedirect("/elsewhere/")
         original["Cache-Control"] = "max-age=60"
