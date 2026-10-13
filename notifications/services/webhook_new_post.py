@@ -47,26 +47,17 @@ SITES = {
 PUSH_IMAGE_SIZES = ("medium_large", "large")
 
 
-def _resized_featured_image(wp_base: str, post: dict) -> str | None:
+def _resized_featured_image(post: dict) -> str | None:
     """Return a push-friendly resized featured image URL, or None.
 
-    Best-effort: any failure falls back to the post's og:image.
+    Reads the featured media embedded in the post response (`_embed`), so no
+    extra request is needed; callers fall back to the post's og:image.
     """
-    media_id = post.get("featured_media")
-    if not isinstance(media_id, int) or isinstance(media_id, bool) or media_id <= 0:
-        return None
-    try:
-        response = requests.get(
-            f"{wp_base}/wp-json/wp/v2/media/{media_id}",
-            params={"_fields": "media_details.sizes"},
-            headers={"User-Agent": "VVP APP Server"},
-            timeout=5,
-        )
-        response.raise_for_status()
-        media = response.json()
-    except (requests.exceptions.RequestException, ValueError) as exc:
-        logger.warning("WordPress media request failed for id=%s: %s", media_id, exc)
-        return None
+    embedded = post.get("_embedded")
+    media_list = (
+        embedded.get("wp:featuredmedia") if isinstance(embedded, dict) else None
+    )
+    media = media_list[0] if isinstance(media_list, list) and media_list else None
     details = media.get("media_details") if isinstance(media, dict) else None
     sizes = details.get("sizes") if isinstance(details, dict) else None
     if not isinstance(sizes, dict):
@@ -135,7 +126,7 @@ def webhook_new_post(request: HttpRequest):
     try:
         response = requests.get(
             wpUrl + "/wp-json/wp/v2/posts/",
-            params={"slug": slug},
+            params={"slug": slug, "_embed": "wp:featuredmedia"},
             headers={"User-Agent": "VVP APP Server"},
             timeout=10,
         )
@@ -161,7 +152,7 @@ def webhook_new_post(request: HttpRequest):
         else None
     )
     image_url = image_url if isinstance(image_url, str) else None
-    image_url = _resized_featured_image(wpUrl, post) or image_url
+    image_url = _resized_featured_image(post) or image_url
     title_field = post.get("title")
     title = html.unescape(
         title_field.get("rendered", "") if isinstance(title_field, dict) else ""

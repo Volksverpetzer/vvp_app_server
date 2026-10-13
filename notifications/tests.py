@@ -655,19 +655,19 @@ class TestNotification(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(mock_async.call_args.kwargs["image"])
 
-    def _post_with_featured_media(self, media_side_effect):
+    def _post_with_embedded_media(self, embedded):
         mock_post = {
             "link": "https://www.volksverpetzer.de/test/",
             "title": {"rendered": "Test"},
-            "featured_media": 123,
             "yoast_head_json": {"og_image": [{"url": "https://mydomain.com/full.png"}]},
+            **({"_embedded": embedded} if embedded is not None else {}),
         }
         post_response = MagicMock()
         post_response.json.return_value = [mock_post]
         with (
             patch(
                 "notifications.services.webhook_new_post.requests.get",
-                side_effect=[post_response, media_side_effect],
+                return_value=post_response,
             ) as mock_get,
             patch("notifications.services.webhook_new_post.async_task") as mock_async,
         ):
@@ -678,44 +678,52 @@ class TestNotification(TestCase):
                 HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
             )
         self.assertEqual(response.status_code, 200)
-        return mock_get, mock_async.call_args.kwargs["image"]
+        # the featured media is embedded in the single post request
+        mock_get.assert_called_once()
+        self.assertEqual(
+            mock_get.call_args.kwargs["params"]["_embed"], "wp:featuredmedia"
+        )
+        return mock_async.call_args.kwargs["image"]
+
+    @staticmethod
+    def _media(sizes):
+        return {"wp:featuredmedia": [{"media_details": {"sizes": sizes}}]}
 
     def test_post_prefers_medium_large_resized_featured_image(self):
-        media_response = MagicMock()
-        media_response.json.return_value = {
-            "media_details": {
-                "sizes": {
+        image = self._post_with_embedded_media(
+            self._media(
+                {
                     "medium_large": {"source_url": "https://mydomain.com/768.png"},
                     "large": {"source_url": "https://mydomain.com/1024.png"},
                     "full": {"source_url": "https://mydomain.com/full.png"},
                 }
-            }
-        }
-        mock_get, image = self._post_with_featured_media(media_response)
+            )
+        )
         self.assertEqual(image, "https://mydomain.com/768.png")
-        self.assertIn("/wp-json/wp/v2/media/123", mock_get.call_args.args[0])
 
     def test_post_falls_back_to_large_when_no_medium_large(self):
-        media_response = MagicMock()
-        media_response.json.return_value = {
-            "media_details": {
-                "sizes": {"large": {"source_url": "https://mydomain.com/1024.png"}}
-            }
-        }
-        _, image = self._post_with_featured_media(media_response)
+        image = self._post_with_embedded_media(
+            self._media({"large": {"source_url": "https://mydomain.com/1024.png"}})
+        )
         self.assertEqual(image, "https://mydomain.com/1024.png")
 
-    def test_post_falls_back_to_og_image_when_media_request_fails(self):
-        _, image = self._post_with_featured_media(
-            requests.exceptions.ConnectionError("boom")
+    def test_post_falls_back_to_og_image_when_no_embedded_media(self):
+        self.assertEqual(
+            self._post_with_embedded_media(None), "https://mydomain.com/full.png"
         )
-        self.assertEqual(image, "https://mydomain.com/full.png")
 
     def test_post_falls_back_to_og_image_when_no_resized_sizes(self):
-        media_response = MagicMock()
-        media_response.json.return_value = {"media_details": {"sizes": {}}}
-        _, image = self._post_with_featured_media(media_response)
-        self.assertEqual(image, "https://mydomain.com/full.png")
+        self.assertEqual(
+            self._post_with_embedded_media(self._media({})),
+            "https://mydomain.com/full.png",
+        )
+
+    def test_post_falls_back_to_og_image_when_embed_is_an_error(self):
+        # WP embeds a {"code": ..., "data": ...} dict when the media is gone
+        embedded = {"wp:featuredmedia": [{"code": "rest_post_invalid_id"}]}
+        self.assertEqual(
+            self._post_with_embedded_media(embedded), "https://mydomain.com/full.png"
+        )
 
 
 class NotificationStatsTest(TestCase):
