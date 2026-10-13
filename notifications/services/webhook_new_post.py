@@ -44,7 +44,7 @@ SITES = {
 # Android shows push images from the FCM payload when the app is closed or in
 # the background, and silently drops them above roughly 1 MB. The full-size
 # featured image is routinely 1.3-1.7 MB, so prefer a resized variant.
-PUSH_IMAGE_SIZES = ("large", "medium_large")
+PUSH_IMAGE_SIZES = ("medium_large", "large")
 
 
 def _resized_featured_image(wp_base: str, post: dict) -> str | None:

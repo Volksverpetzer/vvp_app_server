@@ -680,7 +680,7 @@ class TestNotification(TestCase):
         self.assertEqual(response.status_code, 200)
         return mock_get, mock_async.call_args.kwargs["image"]
 
-    def test_post_prefers_large_resized_featured_image(self):
+    def test_post_prefers_medium_large_resized_featured_image(self):
         media_response = MagicMock()
         media_response.json.return_value = {
             "media_details": {
@@ -692,20 +692,18 @@ class TestNotification(TestCase):
             }
         }
         mock_get, image = self._post_with_featured_media(media_response)
-        self.assertEqual(image, "https://mydomain.com/1024.png")
+        self.assertEqual(image, "https://mydomain.com/768.png")
         self.assertIn("/wp-json/wp/v2/media/123", mock_get.call_args.args[0])
 
-    def test_post_falls_back_to_medium_large_when_no_large(self):
+    def test_post_falls_back_to_large_when_no_medium_large(self):
         media_response = MagicMock()
         media_response.json.return_value = {
             "media_details": {
-                "sizes": {
-                    "medium_large": {"source_url": "https://mydomain.com/768.png"}
-                }
+                "sizes": {"large": {"source_url": "https://mydomain.com/1024.png"}}
             }
         }
         _, image = self._post_with_featured_media(media_response)
-        self.assertEqual(image, "https://mydomain.com/768.png")
+        self.assertEqual(image, "https://mydomain.com/1024.png")
 
     def test_post_falls_back_to_og_image_when_media_request_fails(self):
         _, image = self._post_with_featured_media(
