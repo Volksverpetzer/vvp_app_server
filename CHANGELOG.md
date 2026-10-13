@@ -7,6 +7,11 @@
 * **Admin** — label the empty `platform` / `app_build` filter option in the notification device admin "unknown" instead of showing a bare count ([#82](https://github.com/Volksverpetzer/vvp_app_server/pull/82))
 
 
+### Chores
+
+* **Dependencies** — refresh the lock within existing ranges: django-bootstrap5 26.4, google-auth 2.62.0, numpy 2.5.4, pydantic 2.14.1, pre-commit 4.7.0 and transitive updates
+
+
 ### Tests
 
 * **Fact Check** — mock the Google Fact Check API in `factApi` tests instead of calling it live, which made CI fail on timeouts ([#82](https://github.com/Volksverpetzer/vvp_app_server/pull/82))
