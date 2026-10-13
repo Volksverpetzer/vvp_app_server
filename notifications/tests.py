@@ -1249,6 +1249,20 @@ class NotificationDeviceAdminTest(TestCase):
         self.assertContains(response, "ExponentPushToken[adminIosAAAAAAAAAAAAA]")
         self.assertNotContains(response, "ExponentPushToken[adminAndroidAAAAAAAAA]")
 
+    def test_empty_filter_values_are_labelled_unknown(self):
+        response = self.client.get("/admin/notifications/notificationdevice/")
+        self.assertEqual(response.status_code, 200)
+        # Only the build filter gets an "unknown" option: the Android device
+        # has no app_build, but both devices have a platform. Django renders
+        # the facet count inline in the option's link text.
+        self.assertContains(response, ">unknown (1)</a>", count=1)
+        self.assertContains(response, ">unknown", count=1)
+        response = self.client.get(
+            "/admin/notifications/notificationdevice/", {"app_build": ""}
+        )
+        self.assertContains(response, "ExponentPushToken[adminAndroidAAAAAAAAA]")
+        self.assertNotContains(response, "ExponentPushToken[adminIosAAAAAAAAAAAAA]")
+
     def test_admin_is_view_only(self):
         device = NotificationDevice.objects.get(platform="ios")
         base = "/admin/notifications/notificationdevice/"

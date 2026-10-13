@@ -1,11 +1,16 @@
 from django.utils.deprecation import MiddlewareMixin
 from django.http import HttpRequest, HttpResponse
 
+REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+
 
 class EdgeCacheControlMiddleware(MiddlewareMixin):
     """Set Cache-Control headers.
 
-    No caching for authenticated views; caching for public GETs.
+    No caching for authenticated views or redirects; caching for public GETs.
+
+    Must sit above SecurityMiddleware: its SECURE_SSL_REDIRECT 301 is returned
+    before inner middleware runs, so this would otherwise never see it.
     """
 
     def process_response(
@@ -19,6 +24,13 @@ class EdgeCacheControlMiddleware(MiddlewareMixin):
             response["Cache-Control"] = "no-cache, no-store, must-revalidate"
             response["Pragma"] = "no-cache"
             response["Expires"] = "0"
+        # Never let the edge cache redirects. A 301 that Bunny cached while
+        # it reached the origin without X-Forwarded-Proto pointed back at the
+        # requested https URL itself, sending clients into a redirect loop
+        # until the cache was purged. 304 is not a redirect: it revalidates
+        # a cached response and must not mark it uncacheable.
+        elif response.status_code in REDIRECT_STATUSES:
+            response["Cache-Control"] = "no-store"
         # Cache other GET responses on the edge
         elif request.method == "GET" and response.status_code == 200:
             response["Cache-Control"] = "public, max-age=300"
