@@ -1,3 +1,17 @@
+# [1.7.5](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.4...v1.7.5) (2026-10-13)
+
+
+### Bug Fixes
+
+* **Caching** — send `Cache-Control: no-store` on all redirects, so the CDN edge never caches them. Bunny had cached HTTPS redirects whose `Location` pointed back at the requested URL for six days, sending the app into redirect loops on `/proxy/favs`, `/proxy/stats` and `/proxy/shares`. `EdgeCacheControlMiddleware` now sits above `SecurityMiddleware` so it also sees the `SECURE_SSL_REDIRECT` response; a `Cache-Control` header set by a view is left alone ([#83](https://github.com/Volksverpetzer/vvp_app_server/pull/83))
+* **Admin** — label the empty `platform` / `app_build` filter option in the notification device admin "unknown" instead of showing a bare count ([#82](https://github.com/Volksverpetzer/vvp_app_server/pull/82))
+
+
+### Tests
+
+* **Fact Check** — mock the Google Fact Check API in `factApi` tests instead of calling it live, which made CI fail on timeouts ([#82](https://github.com/Volksverpetzer/vvp_app_server/pull/82))
+
+
 # [1.7.4](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.3...v1.7.4) (2026-10-09)
 
 
