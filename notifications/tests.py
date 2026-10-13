@@ -655,6 +655,70 @@ class TestNotification(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(mock_async.call_args.kwargs["image"])
 
+    def _post_with_featured_media(self, media_side_effect):
+        mock_post = {
+            "link": "https://www.volksverpetzer.de/test/",
+            "title": {"rendered": "Test"},
+            "featured_media": 123,
+            "yoast_head_json": {"og_image": [{"url": "https://mydomain.com/full.png"}]},
+        }
+        post_response = MagicMock()
+        post_response.json.return_value = [mock_post]
+        with (
+            patch(
+                "notifications.services.webhook_new_post.requests.get",
+                side_effect=[post_response, media_side_effect],
+            ) as mock_get,
+            patch("notifications.services.webhook_new_post.async_task") as mock_async,
+        ):
+            response = self.c.post(
+                "/webhook_new_post",
+                data=example_post,
+                content_type="application/json",
+                HTTP_AUTHORIZATION=f"Bearer {os.environ['NOTIFICATION_BEARER']}",
+            )
+        self.assertEqual(response.status_code, 200)
+        return mock_get, mock_async.call_args.kwargs["image"]
+
+    def test_post_prefers_large_resized_featured_image(self):
+        media_response = MagicMock()
+        media_response.json.return_value = {
+            "media_details": {
+                "sizes": {
+                    "medium_large": {"source_url": "https://mydomain.com/768.png"},
+                    "large": {"source_url": "https://mydomain.com/1024.png"},
+                    "full": {"source_url": "https://mydomain.com/full.png"},
+                }
+            }
+        }
+        mock_get, image = self._post_with_featured_media(media_response)
+        self.assertEqual(image, "https://mydomain.com/1024.png")
+        self.assertIn("/wp-json/wp/v2/media/123", mock_get.call_args.args[0])
+
+    def test_post_falls_back_to_medium_large_when_no_large(self):
+        media_response = MagicMock()
+        media_response.json.return_value = {
+            "media_details": {
+                "sizes": {
+                    "medium_large": {"source_url": "https://mydomain.com/768.png"}
+                }
+            }
+        }
+        _, image = self._post_with_featured_media(media_response)
+        self.assertEqual(image, "https://mydomain.com/768.png")
+
+    def test_post_falls_back_to_og_image_when_media_request_fails(self):
+        _, image = self._post_with_featured_media(
+            requests.exceptions.ConnectionError("boom")
+        )
+        self.assertEqual(image, "https://mydomain.com/full.png")
+
+    def test_post_falls_back_to_og_image_when_no_resized_sizes(self):
+        media_response = MagicMock()
+        media_response.json.return_value = {"media_details": {"sizes": {}}}
+        _, image = self._post_with_featured_media(media_response)
+        self.assertEqual(image, "https://mydomain.com/full.png")
+
 
 class NotificationStatsTest(TestCase):
     def setUp(self):
