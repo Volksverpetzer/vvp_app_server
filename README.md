@@ -80,7 +80,9 @@ Copy `.env.sample` to `.env` and fill in the values.
 
 ## Local Development
 
-**Prerequisites:** Python 3.12, PostgreSQL, [uv](https://docs.astral.sh/uv/).
+**Prerequisites:** Python 3.12, PostgreSQL, [uv](https://docs.astral.sh/uv/) 0.13 or newer (`uv self update`).
+
+`pyproject.toml` sets a dependency cooldown (`exclude-newer = "24 hours"`): `uv lock` never picks a release younger than a day. For an urgent security release, add a temporary per-package exception in `exclude-newer-package` and remove it once that release is older than a day.
 
 ```bash
 # 1. Install dependencies (creates .venv and installs the dev dependency
