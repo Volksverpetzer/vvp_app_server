@@ -158,22 +158,25 @@ The container starts both `gunicorn` (port 8080) and `qcluster` via the `CMD` in
 | Hostname | Served by | Origin |
 |----------|-----------|--------|
 | `volksverpetzer-app.de` | Bunny pull zone `vvp-app-api` | `vvpappserver` Scaleway container |
-| `mimikama.volksverpetzer-app.de` | Scaleway directly (DNS CNAME) | `mimikamaappserver` container |
+| `mimikama.volksverpetzer-app.de` | Bunny pull zone `mimikama-app-api` | `mimikamaappserver` Scaleway container |
 | `staging.volksverpetzer-app.de` | Scaleway directly (DNS CNAME) | `vvpappserverstaging` container |
 
-DNS for `volksverpetzer-app.de` is hosted in Bunny DNS; the apex is a `PZ` (pull zone) record.
+DNS for `volksverpetzer-app.de` is hosted in Bunny DNS; the apex and `mimikama` are `PZ` (pull zone) records.
 
-### Bunny pull zone `vvp-app-api`
+### Bunny pull zones `vvp-app-api` and `mimikama-app-api`
+
+Both zones are set up the same way; `mimikama-app-api` sends `mimikama.volksverpetzer-app.de` as its `X-Forwarded-Host` and has no CORS rule, since there is no Mimikama web app.
+
 
 - **Origin URL** is the container's own `*.functions.fnc.fr-par.scw.cloud` URL, with **Forward Host Header off**. Scaleway then routes by its own hostname, so the container needs no Scaleway custom domain for `volksverpetzer-app.de`.
 - **Edge rule "Origin: send public host as X-Forwarded-Host"** sets `X-Forwarded-Host: volksverpetzer-app.de` on every request. Django reads it via `USE_X_FORWARDED_HOST` for `ALLOWED_HOSTS`, CSRF and absolute URLs (e.g. the `media_url` links in the Instagram feed). Without it every request is a `400`.
 - **Edge rule "CORS: add headers for web.volksverpetzer.de on cached responses"** sets `Access-Control-Allow-Origin: https://web.volksverpetzer.de` and `Access-Control-Allow-Credentials: true` when the request's `Origin` is the web app. Bunny does not honour `Vary: Origin`, so a copy cached for the native app (no `Origin`) would otherwise reach the web app without CORS headers.
 - **Caching** respects the origin's `Cache-Control` (set by `EdgeCacheControlMiddleware`) and keeps the query string in the cache key.
-- **TLS** for `volksverpetzer-app.de` is Bunny's free certificate, with Force SSL on.
+- **TLS** for the public hostname is Bunny's free certificate, with Force SSL on.
 
 ### Don't put a Scaleway custom domain behind Bunny
 
-A Scaleway custom domain only renews its certificate while the hostname's DNS points at the container. Once DNS points at Bunny, renewal fails, Scaleway drops the hostname from its routing and every request returns an empty `404`. This took `volksverpetzer-app.de` down in October 2026. So either point DNS straight at the container and keep the Scaleway custom domain (as Mimikama and staging do), or put the hostname behind a pull zone set up like `vvp-app-api` and delete its Scaleway custom domain.
+A Scaleway custom domain only renews its certificate while the hostname's DNS points at the container. Once DNS points at Bunny, renewal fails, Scaleway drops the hostname from its routing and every request returns an empty `404`. This took `volksverpetzer-app.de` down in October 2026. So either point DNS straight at the container and keep the Scaleway custom domain (as staging does), or put the hostname behind a pull zone set up like `vvp-app-api` and delete its Scaleway custom domain.
 
 ## CI/CD
 
