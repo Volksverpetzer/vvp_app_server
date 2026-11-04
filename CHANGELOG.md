@@ -4,6 +4,7 @@
 ### Features
 
 * **Admin** — lock out an IP for one hour after 5 failed logins on `/admin/` and `/accounts/` (django-axes, HTTP `429`, even with the right password). Lockouts are per IP rather than per user so nobody can lock staff out on purpose, use `REMOTE_ADDR` so a forged `X-Forwarded-For` can't get around them, and attempts while locked don't extend the hour. Only failed attempts are stored; unlock early with `python manage.py axes_reset_ip <ip>` ([#90](https://github.com/Volksverpetzer/vvp_app_server/pull/90))
+* **Notifications** — log an `ERROR` ("High push receipt failure rate") when more than 10% of at least 50 push receipts in a run failed, so delivery problems that raise no exception show up in the container logs and can be alerted on once error tracking is set up. `DeviceNotRegistered` receipts are normal churn and don't count as failures ([#63](https://github.com/Volksverpetzer/vvp_app_server/pull/63))
 
 
 ### Chores
