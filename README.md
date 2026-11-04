@@ -167,7 +167,6 @@ DNS for `volksverpetzer-app.de` is hosted in Bunny DNS; the apex and `mimikama` 
 
 Both zones are set up the same way; `mimikama-app-api` sends `mimikama.volksverpetzer-app.de` as its `X-Forwarded-Host` and has no CORS rule, since there is no Mimikama web app.
 
-
 - **Origin URL** is the container's own `*.functions.fnc.fr-par.scw.cloud` URL, with **Forward Host Header off**. Scaleway then routes by its own hostname, so the container needs no Scaleway custom domain for `volksverpetzer-app.de`.
 - **Edge rule "Origin: send public host as X-Forwarded-Host"** sets `X-Forwarded-Host: volksverpetzer-app.de` on every request. Django reads it via `USE_X_FORWARDED_HOST` for `ALLOWED_HOSTS`, CSRF and absolute URLs (e.g. the `media_url` links in the Instagram feed). Without it every request is a `400`.
 - **Edge rule "CORS: add headers for web.volksverpetzer.de on cached responses"** sets `Access-Control-Allow-Origin: https://web.volksverpetzer.de` and `Access-Control-Allow-Credentials: true` when the request's `Origin` is the web app. Bunny does not honour `Vary: Origin`, so a copy cached for the native app (no `Origin`) would otherwise reach the web app without CORS headers.
