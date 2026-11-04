@@ -4,6 +4,7 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import User
+from django.http import HttpRequest
 from django.test import Client, RequestFactory, TestCase, override_settings
 
 from .models import FakeReport
@@ -167,7 +168,9 @@ class ReportFakeViewsTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="test", password="dummy_password")  # nosec
         self.client = Client()
-        self.client.login(username="test", password="dummy_password")  # nosec
+        self.client.login(
+            request=HttpRequest(), username="test", password="dummy_password"
+        )  # nosec
 
     def test_statusFake(self):
         response = self.client.get("/statusFake/999")

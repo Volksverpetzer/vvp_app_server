@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import requests
 
 from django.contrib.auth.models import User
+from django.http import HttpRequest
 from django.test import Client, TestCase
 
 from .models import NotificationDevice, PushMessageLog
@@ -1263,7 +1264,7 @@ class TaskMonitorViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="monitor", password="pw")  # nosec
         self.client = Client()
-        self.client.login(username="monitor", password="pw")  # nosec
+        self.client.login(request=HttpRequest(), username="monitor", password="pw")  # nosec
 
     @patch("notifications.services.task_monitor.get_broker")
     @patch("notifications.services.task_monitor.Stat")
@@ -1282,7 +1283,7 @@ class ReceiptsMonitorViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="receipts", password="pw")  # nosec
         self.client = Client()
-        self.client.login(username="receipts", password="pw")  # nosec
+        self.client.login(request=HttpRequest(), username="receipts", password="pw")  # nosec
 
     @patch("notifications.services.receipts_monitor.check_receipts", return_value=[])
     def test_receipts_monitor_renders(self, _mock):

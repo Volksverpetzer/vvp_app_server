@@ -1,5 +1,6 @@
+from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseRedirect
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
 from .middleware import EdgeCacheControlMiddleware
 
@@ -36,3 +37,58 @@ class EdgeCacheControlMiddlewareTests(SimpleTestCase):
         self.assertEqual(response.status_code, 301)
         self.assertTrue(response["Location"].startswith("https://"))
         self.assertEqual(response["Cache-Control"], "no-store")
+
+
+class AdminLoginLockoutTests(TestCase):
+    ATTACKER_IP = "203.0.113.7"
+    OTHER_IP = "198.51.100.23"
+    PASSWORD = "correct-horse-battery"  # nosec
+
+    def setUp(self):
+        User.objects.create_user(
+            username="staff", password=self.PASSWORD, is_staff=True
+        )
+
+    def _login(self, password: str, ip: str, **extra: str):
+        return self.client.post(
+            "/admin/login/",
+            {"username": "staff", "password": password},
+            REMOTE_ADDR=ip,
+            **extra,
+        )
+
+    def _fail(self, times: int, ip: str, **extra: str):
+        for _ in range(times):
+            self._login("wrong", ip, **extra)
+
+    def test_ip_is_locked_after_five_failures(self):
+        self._fail(4, self.ATTACKER_IP)
+        # The fifth wrong password already gets the lockout response
+        self.assertEqual(self._login("wrong", self.ATTACKER_IP).status_code, 429)
+        # Locked out even with the right password
+        response = self._login(self.PASSWORD, self.ATTACKER_IP)
+        self.assertEqual(response.status_code, 429)
+
+    def test_lockout_is_per_ip_not_per_user(self):
+        self._fail(5, self.ATTACKER_IP)
+        # The real staff member on another IP can still log in
+        response = self._login(self.PASSWORD, self.OTHER_IP)
+        self.assertEqual(response.status_code, 302)
+
+    def test_success_resets_the_counter(self):
+        self._fail(4, self.ATTACKER_IP)
+        self.assertEqual(self._login(self.PASSWORD, self.ATTACKER_IP).status_code, 302)
+        self.client.logout()
+        self._fail(4, self.ATTACKER_IP)
+        response = self._login(self.PASSWORD, self.ATTACKER_IP)
+        self.assertEqual(response.status_code, 302)
+
+    def test_spoofed_forwarded_for_does_not_evade_lockout(self):
+        # Rotating X-Forwarded-For must not count as different clients:
+        # axes keys on REMOTE_ADDR (see AXES_LOCKOUT_PARAMETERS).
+        for i in range(5):
+            self._fail(1, self.ATTACKER_IP, HTTP_X_FORWARDED_FOR=f"192.0.2.{i}")
+        response = self._login(
+            self.PASSWORD, self.ATTACKER_IP, HTTP_X_FORWARDED_FOR="192.0.2.99"
+        )
+        self.assertEqual(response.status_code, 429)
