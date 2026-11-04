@@ -26,6 +26,9 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG") == "enabled"
 
 # Settings for handling proxy and CDN
+# Bunny reaches the container by its scw.cloud hostname and passes the public
+# host in X-Forwarded-Host; without this every request is a 400 (see README,
+# "Hosting & CDN").
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
