@@ -111,6 +111,14 @@ Push notifications and scheduled tasks are processed by a **Django-Q** cluster. 
 python manage.py qcluster
 ```
 
+### Admin Login Lockout
+
+The admin and `/accounts/` logins are protected by [django-axes](https://django-axes.readthedocs.io/): after 5 failed attempts the client IP is locked out for one hour (HTTP `429`), even with the right password. To unlock an IP early, run against the affected environment's database:
+
+```bash
+python manage.py axes_reset_ip <ip>
+```
+
 ## Connecting the Mobile App to the Local Server
 
 The app's `apiUrl` is set in `config/volksverpetzer.config.ts` (or `mimikama.config.ts`) and typed as `HttpsUrl`, so a cast is required for a plain HTTP local address.
