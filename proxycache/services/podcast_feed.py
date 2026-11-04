@@ -22,6 +22,7 @@ def get_feed_url() -> str:
     """
     return os.environ.get("PODCAST_FEED_URL", "").strip() or DEFAULT_FEED_URL
 
+
 ITUNES_NS = "{http://www.itunes.com/dtds/podcast-1.0.dtd}"
 
 
