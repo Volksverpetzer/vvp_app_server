@@ -26,6 +26,9 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG") == "enabled"
 
 # Settings for handling proxy and CDN
+# Bunny reaches the container by its scw.cloud hostname and passes the public
+# host in X-Forwarded-Host; without this every request is a 400 (see README,
+# "Hosting & CDN").
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -107,6 +110,7 @@ INSTALLED_APPS = [
     "info",
     "django_q",
     "django_bootstrap5",
+    "axes",
 ]
 
 MIDDLEWARE = [
@@ -122,6 +126,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_ratelimit.middleware.RatelimitMiddleware",
+    # Last, as django-axes requires: turns a lockout into its 429 response
+    "axes.middleware.AxesMiddleware",
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -229,6 +235,28 @@ AUTH_PASSWORD_VALIDATORS = [
         "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",  # noqa: E501
     },
 ]
+
+# Brute-force protection for the admin and /accounts/ logins (django-axes).
+# AxesStandaloneBackend must come first: it rejects locked-out clients before
+# ModelBackend checks the password.
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
+# Lock the client IP, not the username: locking by username would let anyone
+# lock a staff member out of the admin by guessing wrong on purpose.
+# django-ipware is deliberately not installed, so axes uses REMOTE_ADDR,
+# which is the real client IP behind Bunny and Scaleway and can't be spoofed
+# with an X-Forwarded-For header (the same value django-ratelimit keys on).
+AXES_LOCKOUT_PARAMETERS = ["ip_address"]
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # hours; afterwards the client may try again
+# Attempts while locked out don't restart the hour; otherwise an attacker who
+# keeps hammering also keeps staff behind the same IP locked out indefinitely
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
+AXES_RESET_ON_SUCCESS = True
+# Only failed attempts are stored, not every successful staff login
+AXES_DISABLE_ACCESS_LOG = True
 
 
 # Internationalization

@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import requests
 
 from django.contrib.auth.models import User
+from django.http import HttpRequest
 from django.test import Client, TestCase
 
 from .models import NotificationDevice, PushMessageLog
@@ -1251,6 +1252,30 @@ class ProcessReceiptsTest(TestCase):
         self.assertEqual(process_receipts(), 0)
         mock_build.return_value.check_receipts_multiple.assert_not_called()
 
+    @patch("notifications.helper._build_push_client")
+    def test_high_failure_rate_logs_error(self, mock_build):
+        # 12/60 = 20% failed receipts (> 10%); unregistered devices don't count.
+        receipts = [self._receipt(f"x{i}", "error", "MessageTooBig") for i in range(12)]
+        receipts += [self._receipt(f"y{i}") for i in range(48)]
+        receipts.append(self._receipt("t-dead", "error", "DeviceNotRegistered"))
+        mock_build.return_value.check_receipts_multiple.return_value = receipts
+        from notifications.helper import process_receipts
+
+        with self.assertLogs("notifications.helper", level="ERROR") as logs:
+            process_receipts()
+        self.assertTrue(any("High push receipt failure" in m for m in logs.output))
+
+    @patch("notifications.helper._build_push_client")
+    def test_low_failure_rate_does_not_alert(self, mock_build):
+        receipts = [self._receipt("x0", "error", "MessageTooBig")]
+        receipts += [self._receipt(f"y{i}") for i in range(59)]
+        mock_build.return_value.check_receipts_multiple.return_value = receipts
+        from notifications.helper import process_receipts
+
+        with self.assertLogs("notifications.helper", level="ERROR") as logs:
+            process_receipts()
+        self.assertFalse(any("High push receipt failure" in m for m in logs.output))
+
     def test_hourly_schedule_exists(self):
         from django_q.models import Schedule  # type: ignore[reportMissingTypeStubs]
 
@@ -1263,7 +1288,7 @@ class TaskMonitorViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="monitor", password="pw")  # nosec
         self.client = Client()
-        self.client.login(username="monitor", password="pw")  # nosec
+        self.client.login(request=HttpRequest(), username="monitor", password="pw")  # nosec
 
     @patch("notifications.services.task_monitor.get_broker")
     @patch("notifications.services.task_monitor.Stat")
@@ -1282,7 +1307,7 @@ class ReceiptsMonitorViewTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="receipts", password="pw")  # nosec
         self.client = Client()
-        self.client.login(username="receipts", password="pw")  # nosec
+        self.client.login(request=HttpRequest(), username="receipts", password="pw")  # nosec
 
     @patch("notifications.services.receipts_monitor.check_receipts", return_value=[])
     def test_receipts_monitor_renders(self, _mock):

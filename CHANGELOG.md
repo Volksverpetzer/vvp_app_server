@@ -1,3 +1,26 @@
+# [1.7.7](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.6...v1.7.7) (2026-11-04)
+
+
+### Features
+
+* **Admin** — lock out an IP for one hour after 5 failed logins on `/admin/` and `/accounts/` (django-axes, HTTP `429`, even with the right password). Lockouts are per IP rather than per user so nobody can lock staff out on purpose, use `REMOTE_ADDR` so a forged `X-Forwarded-For` can't get around them, and attempts while locked don't extend the hour. Only failed attempts are stored; unlock early with `python manage.py axes_reset_ip <ip>` ([#90](https://github.com/Volksverpetzer/vvp_app_server/pull/90))
+* **Notifications** — log an `ERROR` ("High push receipt failure rate") when more than 10% of at least 50 push receipts in a run failed, so delivery problems that raise no exception show up in the container logs and can be alerted on once error tracking is set up. `DeviceNotRegistered` receipts are normal churn and don't count as failures ([#63](https://github.com/Volksverpetzer/vvp_app_server/pull/63))
+
+
+### Bug Fixes
+
+* **Payments** — never cache `/paymentIntent`. The app requests it with `GET`, which `EdgeCacheControlMiddleware` marked `public, max-age=300`; behind the Bunny pull zone, every donor choosing the same amount within five minutes received the same `client_secret`, i.e. the same Stripe PaymentIntent, so after the first donor paid the others' payments could fail. The view is now `@never_cache` ([#96](https://github.com/Volksverpetzer/vvp_app_server/pull/96))
+
+
+### Chores
+
+* **Security** — fix all 74 open Dependabot alerts in transitive dependencies: pillow 13.0.0, certifi 2026.10.23, filelock 4.2.7, pyasn1 0.6.5, virtualenv 21.15.2 ([#91](https://github.com/Volksverpetzer/vvp_app_server/pull/91))
+* **Dependencies** — Django 6.1.3 (security release), django-axes 9.0.0, stripe 16.1.0 (pins Stripe API version `2026-10-28.endive`), pandas 3.1.0, atproto 0.0.73, ruff 0.17.3 and transitive updates; pre-commit hooks updated to match ([#91](https://github.com/Volksverpetzer/vvp_app_server/pull/91)); coverage 7.17.1 ([#93](https://github.com/Volksverpetzer/vvp_app_server/pull/93))
+* **Dependabot** — also update the `uv` dependencies weekly, with minor and patch updates grouped into one PR ([#91](https://github.com/Volksverpetzer/vvp_app_server/pull/91))
+* **Dependencies** — enforce a one-day cooldown in uv (`exclude-newer = "24 hours"`), so `uv lock` never picks a release younger than a day; require uv 0.13 or newer ([#95](https://github.com/Volksverpetzer/vvp_app_server/pull/95))
+* **Docs** — document the Bunny CDN setup in front of the API in the README, including why a Scaleway custom domain must not sit behind Bunny ([#89](https://github.com/Volksverpetzer/vvp_app_server/pull/89))
+
+
 # [1.7.6](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.5...v1.7.6) (2026-10-13)
 
 
