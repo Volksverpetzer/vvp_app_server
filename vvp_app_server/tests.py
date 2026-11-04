@@ -1,3 +1,4 @@
+from axes.models import AccessAttempt
 from django.contrib.auth.models import User
 from django.http import HttpResponse, HttpResponseRedirect
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
@@ -68,6 +69,16 @@ class AdminLoginLockoutTests(TestCase):
         # Locked out even with the right password
         response = self._login(self.PASSWORD, self.ATTACKER_IP)
         self.assertEqual(response.status_code, 429)
+
+    def test_retries_while_locked_do_not_extend_the_lockout(self):
+        self._fail(5, self.ATTACKER_IP)
+        attempt = AccessAttempt.objects.get(ip_address=self.ATTACKER_IP)
+        locked_since = attempt.attempt_time
+        self.assertEqual(self._login("wrong", self.ATTACKER_IP).status_code, 429)
+        self.assertEqual(self._login(self.PASSWORD, self.ATTACKER_IP).status_code, 429)
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.attempt_time, locked_since)
+        self.assertEqual(attempt.failures_since_start, 5)
 
     def test_lockout_is_per_ip_not_per_user(self):
         self._fail(5, self.ATTACKER_IP)

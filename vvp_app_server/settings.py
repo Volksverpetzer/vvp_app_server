@@ -248,6 +248,9 @@ AUTHENTICATION_BACKENDS = [
 AXES_LOCKOUT_PARAMETERS = ["ip_address"]
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 1  # hours; afterwards the client may try again
+# Attempts while locked out don't restart the hour; otherwise an attacker who
+# keeps hammering also keeps staff behind the same IP locked out indefinitely
+AXES_RESET_COOL_OFF_ON_FAILURE_DURING_LOCKOUT = False
 AXES_RESET_ON_SUCCESS = True
 # Only failed attempts are stored, not every successful staff login
 AXES_DISABLE_ACCESS_LOG = True
