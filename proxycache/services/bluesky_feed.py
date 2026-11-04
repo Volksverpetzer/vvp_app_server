@@ -8,13 +8,14 @@ from vvp_app_server.cache_utils import cache_response
 
 DEFAULT_ACCOUNT = "volksverpetzer"
 
+# Values are env var names, not secrets (hence the bandit B105 suppressions)
 ACCOUNTS = {
-    "volksverpetzer": {"handle_env": "BSKY_HANDLE", "pwd_env": "BSKY_PWD"},
+    "volksverpetzer": {"handle_env": "BSKY_HANDLE", "pwd_env": "BSKY_PWD"},  # nosec B105
     "pruefpunkt": {
         "handle_env": "BSKY_HANDLE_PRUEFPUNKT",
-        "pwd_env": "BSKY_PWD_PRUEFPUNKT",
+        "pwd_env": "BSKY_PWD_PRUEFPUNKT",  # nosec B105
     },
-    "bot": {"handle_env": "BSKY_BOT_HANDLE", "pwd_env": "BSKY_BOT_PWD"},
+    "bot": {"handle_env": "BSKY_BOT_HANDLE", "pwd_env": "BSKY_BOT_PWD"},  # nosec B105
 }
 
 

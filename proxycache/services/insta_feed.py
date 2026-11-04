@@ -12,12 +12,13 @@ from vvp_app_server.cache_utils import cache_response
 
 DEFAULT_ACCOUNT = "volksverpetzer"
 
-# Supported Instagram accounts and the env var holding their initial token.
+# Supported Instagram accounts and the env var holding their initial token
+# (env var names, not secrets: hence the bandit B105 suppressions).
 ACCOUNTS = {
-    "volksverpetzer": {"token_env": "INSTAGRAM_ACCESS_TOKEN"},
-    "pruefpunkt": {"token_env": "INSTAGRAM_ACCESS_TOKEN_PRUEFPUNKT"},
+    "volksverpetzer": {"token_env": "INSTAGRAM_ACCESS_TOKEN"},  # nosec B105
+    "pruefpunkt": {"token_env": "INSTAGRAM_ACCESS_TOKEN_PRUEFPUNKT"},  # nosec B105
     # The Mimikama app requests its handle as the account.
-    "mimikama_org": {"token_env": "INSTAGRAM_ACCESS_TOKEN_MIMIKAMA"},
+    "mimikama_org": {"token_env": "INSTAGRAM_ACCESS_TOKEN_MIMIKAMA"},  # nosec B105
 }
 
 
