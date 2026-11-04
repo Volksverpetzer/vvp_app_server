@@ -46,9 +46,6 @@ required-version = ">=0.13"
 # rule as pnpm's minimumReleaseAge in vvp_app. Exceptions for urgent
 # security releases go into exclude-newer-package and are removed later.
 exclude-newer = "24 hours"
-# Django 6.1.3 security release (published 2026-11-03 15:21 UTC); remove
-# once it is a day old
-exclude-newer-package = { django = "12 hours" }
 
 [tool.ruff.lint]
 select = ["E", "F", "DJ", "DTZ", "S", "PD"]
