@@ -12,6 +12,7 @@
 * **Security** — fix all 74 open Dependabot alerts in transitive dependencies: pillow 13.0.0, certifi 2026.10.23, filelock 4.2.7, pyasn1 0.6.5, virtualenv 21.15.2 ([#91](https://github.com/Volksverpetzer/vvp_app_server/pull/91))
 * **Dependencies** — Django 6.1.3 (security release), django-axes 9.0.0, stripe 16.1.0 (pins Stripe API version `2026-10-28.endive`), pandas 3.1.0, atproto 0.0.73, ruff 0.17.3 and transitive updates; pre-commit hooks updated to match ([#91](https://github.com/Volksverpetzer/vvp_app_server/pull/91)); coverage 7.17.1 ([#93](https://github.com/Volksverpetzer/vvp_app_server/pull/93))
 * **Dependabot** — also update the `uv` dependencies weekly, with minor and patch updates grouped into one PR ([#91](https://github.com/Volksverpetzer/vvp_app_server/pull/91))
+* **Dependencies** — enforce a one-day cooldown in uv (`exclude-newer = "24 hours"`), so `uv lock` never picks a release younger than a day, with a temporary exception for the Django 6.1.3 security release; require uv 0.13 or newer ([#95](https://github.com/Volksverpetzer/vvp_app_server/pull/95))
 * **Docs** — document the Bunny CDN setup in front of the API in the README, including why a Scaleway custom domain must not sit behind Bunny ([#89](https://github.com/Volksverpetzer/vvp_app_server/pull/89))
 
 
