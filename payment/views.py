@@ -4,9 +4,15 @@ import os
 
 import stripe
 from django.http import HttpRequest, JsonResponse
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 
 
+# Every call creates a new PaymentIntent, so the reply must never be cached:
+# the app sends a GET, which EdgeCacheControlMiddleware would otherwise mark
+# public, and Bunny would hand one client_secret to every donor choosing the
+# same amount within five minutes.
+@never_cache
 @csrf_exempt
 def paymentIntent(request: HttpRequest):
     """Create a Payment Intent.

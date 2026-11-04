@@ -7,6 +7,11 @@
 * **Notifications** — log an `ERROR` ("High push receipt failure rate") when more than 10% of at least 50 push receipts in a run failed, so delivery problems that raise no exception show up in the container logs and can be alerted on once error tracking is set up. `DeviceNotRegistered` receipts are normal churn and don't count as failures ([#63](https://github.com/Volksverpetzer/vvp_app_server/pull/63))
 
 
+### Bug Fixes
+
+* **Payments** — never cache `/paymentIntent`. The app requests it with `GET`, which `EdgeCacheControlMiddleware` marked `public, max-age=300`; behind the Bunny pull zone, every donor choosing the same amount within five minutes received the same `client_secret`, i.e. the same Stripe PaymentIntent, so after the first donor paid the others' payments could fail. The view is now `@never_cache` ([#96](https://github.com/Volksverpetzer/vvp_app_server/pull/96))
+
+
 ### Chores
 
 * **Security** — fix all 74 open Dependabot alerts in transitive dependencies: pillow 13.0.0, certifi 2026.10.23, filelock 4.2.7, pyasn1 0.6.5, virtualenv 21.15.2 ([#91](https://github.com/Volksverpetzer/vvp_app_server/pull/91))

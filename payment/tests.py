@@ -60,6 +60,16 @@ class PaymentTestCase(TestCase):
         # Verify the mock was called with the expected arguments for amount=3
         self.mock_payment_intent.assert_called_with(amount=300, currency="eur")
 
+    def test_payment_intent_is_never_cached(self):
+        # The app requests it with GET; a cacheable reply would let the CDN
+        # serve one client_secret to several donors.
+        response = self.client.get("/paymentIntent?amount=3")
+        self.assertEqual(response.status_code, 200)
+        cache_control = response["Cache-Control"]
+        self.assertIn("no-store", cache_control)
+        self.assertIn("private", cache_control)
+        self.assertNotIn("public", cache_control)
+
     def test_malicious_payment(self):
         # Test with extremely large amount
         response = self.client.post("/paymentIntent?amount=100000")
