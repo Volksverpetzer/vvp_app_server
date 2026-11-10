@@ -9,6 +9,7 @@
 ### Chores
 
 * **Dependencies** — coverage 7.17.2, pandas 3.1.1, ruff 0.17.4 (Dependabot [#99](https://github.com/Volksverpetzer/vvp_app_server/pull/99), landed with [#100](https://github.com/Volksverpetzer/vvp_app_server/pull/100))
+* **Dependencies** — transitive patch/minor updates: click 8.5.1, dnspython 2.9.2, filelock 4.2.9, google-api-core 2.44.0, platformdirs 4.14.5, py-serializable 2.2.0, pydantic 2.14.3, pydantic-core 2.50.4, python-discovery 1.9.5, typing-inspection 0.4.5, virtualenv 21.15.6; ruff pre-commit hook v0.17.4 to match the locked ruff. python-dateutil stays at 2.9 (4.0 is a major release pulled in by pandas/matplotlib)
 * **Docs** — README: the Bunny pull zones' "Disable Cookies" setting must be off, otherwise `Set-Cookie` is stripped and the admin login loops back to the login page (with a `curl` check); `GET` views that must return a fresh response on each call need `@never_cache` ([#98](https://github.com/Volksverpetzer/vvp_app_server/pull/98))
 
 
