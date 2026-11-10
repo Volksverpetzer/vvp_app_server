@@ -1,3 +1,12 @@
+# [1.7.9](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.8...v1.7.9) (2026-11-10)
+
+
+### Chores
+
+* **Dependencies** — python-dateutil 4.0.0 (major release, pulled in by pandas and matplotlib; requires Python 3.11+, drops `six`, stricter `isoparse`). The server doesn't call dateutil directly, and pandas parses the WordPress `date_gmt` ISO timestamps itself ([#103](https://github.com/Volksverpetzer/vvp_app_server/pull/103))
+* **Tests** — render the real `/proxy/map` PNG and check that the quartiles use the palette in order, with `#EE8FBE` for the top quartile, so the near-identical pinks can't come back unnoticed ([#103](https://github.com/Volksverpetzer/vvp_app_server/pull/103))
+
+
 # [1.7.8](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.7...v1.7.8) (2026-11-10)
 
 

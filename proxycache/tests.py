@@ -810,6 +810,86 @@ class AnalyticsMapTest(TestCase):
         blocked = self.client.get(reverse("map"))
         self.assertEqual(blocked.status_code, 429)
 
+    @patch("proxycache.services.analytics.cache_set")
+    @patch("proxycache.services.analytics.cache_get", return_value=None)
+    @patch("proxycache.services.analytics.requests.post")
+    @patch("proxycache.services.analytics.requests.get")
+    @override_settings(RATELIMIT_ENABLE=False)
+    def test_map_renders_quartiles_in_palette_order(
+        self, mock_get, mock_post, _mock_cache_get, _mock_cache_set
+    ):
+        """Render the real PNG and check each quartile's color.
+
+        Four side-by-side squares stand in for the states, ordered from the
+        lowest to the highest per-capita pageviews, so reading the middle row
+        left to right must give the palette from bottom to top quartile. The
+        top quartile must stay distinguishable from the second (#EE8FBE, not
+        the near-identical #D31C74).
+        """
+        import io
+        import json
+
+        from PIL import Image
+        from proxycache.services.analytics import REGION_MAPPING
+
+        # Lowest to highest normalized pageviews (per 100k inhabitants).
+        regions = ["NW", "BY", "BW", "BE"]
+        features = [
+            {
+                "type": "Feature",
+                "properties": {"id": f"DE-{code}"},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[i, 0], [i + 1, 0], [i + 1, 1], [i, 1], [i, 0]]],
+                },
+            }
+            for i, code in enumerate(regions)
+        ]
+        geo_resp = MagicMock(
+            content=json.dumps(
+                {"type": "FeatureCollection", "features": features}
+            ).encode()
+        )
+        mock_get.return_value = geo_resp
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "results": [
+                    {
+                        "dimensions": [f"DE-{code}"],
+                        "metrics": [
+                            (rank + 1) * 10 * REGION_MAPPING[code]["population"] / 10**5
+                        ],
+                    }
+                    for rank, code in enumerate(regions)
+                ]
+            },
+        )
+
+        response = self.client.get(reverse("map"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+
+        palette = {
+            (0x1B, 0x71, 0x94): "#1B7194",
+            (0x38, 0x93, 0xC0): "#3893C0",
+            (0xDB, 0x26, 0x85): "#DB2685",
+            (0xEE, 0x8F, 0xBE): "#EE8FBE",
+        }
+        image = Image.open(io.BytesIO(response.content)).convert("RGB")
+        y = image.height // 2
+        seen: list[str] = []
+        for x in range(image.width):
+            color = palette.get(image.getpixel((x, y)))  # type: ignore[arg-type]
+            if color and (not seen or seen[-1] != color):
+                seen.append(color)
+        # The background shares the bottom quartile's color, so it can show
+        # up at either edge; drop it there before comparing.
+        while seen and seen[-1] == "#1B7194":
+            seen.pop()
+        self.assertEqual(seen[-3:], ["#3893C0", "#DB2685", "#EE8FBE"])
+        self.assertIn("#1B7194", seen[:-3])
+
 
 class CacheUtilsTest(TestCase):
     def test_cache_get_warms_memory_from_persistent(self):
