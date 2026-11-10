@@ -1,3 +1,16 @@
+# [1.7.8](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.7...v1.7.8) (2026-11-10)
+
+
+### Bug Fixes
+
+* **Region map** — make the top quartile of `/proxy/map` distinguishable from the second: "Vorreiter" states were `#D31C74` and "Überdurchschnittlich" states `#DB2685`, which are nearly identical. The top quartile is now a light pink `#EE8FBE`; the app's legend mirrors these colors ([#100](https://github.com/Volksverpetzer/vvp_app_server/pull/100), app: [vvp_app#717](https://github.com/Volksverpetzer/vvp_app/pull/717))
+
+
+### Chores
+
+* **Docs** — README: the Bunny pull zones' "Disable Cookies" setting must be off, otherwise `Set-Cookie` is stripped and the admin login loops back to the login page (with a `curl` check); `GET` views that must return a fresh response on each call need `@never_cache` ([#98](https://github.com/Volksverpetzer/vvp_app_server/pull/98))
+
+
 # [1.7.7](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.6...v1.7.7) (2026-11-04)
 
 
