@@ -257,7 +257,7 @@ def map(request: HttpRequest):
             germany["normalized_pageviews"], 4, labels=False, duplicates="drop"
         )
 
-        colors = ["#D31C74", "#DB2685", "#3893c0", "#1b7194"]
+        colors = ["#EE8FBE", "#DB2685", "#3893c0", "#1b7194"]
         colors.reverse()
         cmap = mcolors.ListedColormap(colors)
         fig, ax = plt.subplots(figsize=(10, 10))
