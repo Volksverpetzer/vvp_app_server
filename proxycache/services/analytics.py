@@ -257,7 +257,10 @@ def map(request: HttpRequest):
             germany["normalized_pageviews"], 4, labels=False, duplicates="drop"
         )
 
-        colors = ["#DB2685", "#EE8FBE", "#3893c0", "#1b7194"]
+        # Highest quartile first. Must match `regionMapColors` in
+        # @volksverpetzer/design-tokens (vvp_design_system
+        # packages/tokens/tokens/region-map.json) and the app's legend.
+        colors = ["#DB2685", "#EE8FBE", "#3893C0", "#1B7194"]
         colors.reverse()
         cmap = mcolors.ListedColormap(colors)
         fig, ax = plt.subplots(figsize=(10, 10))
