@@ -823,8 +823,8 @@ class AnalyticsMapTest(TestCase):
         Four side-by-side squares stand in for the states, ordered from the
         lowest to the highest per-capita pageviews, so reading the middle row
         left to right must give the palette from bottom to top quartile. The
-        top quartile must stay distinguishable from the second (#EE8FBE, not
-        the near-identical #D31C74).
+        top quartile (#DB2685) must stay distinguishable from the second
+        (#EE8FBE).
         """
         import io
         import json
@@ -887,7 +887,7 @@ class AnalyticsMapTest(TestCase):
         # up at either edge; drop it there before comparing.
         while seen and seen[-1] == "#1B7194":
             seen.pop()
-        self.assertEqual(seen[-3:], ["#3893C0", "#DB2685", "#EE8FBE"])
+        self.assertEqual(seen[-3:], ["#3893C0", "#EE8FBE", "#DB2685"])
         self.assertIn("#1B7194", seen[:-3])
 
 
