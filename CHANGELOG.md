@@ -10,6 +10,7 @@
 ### Chores
 
 * **Dependencies** — gunicorn 27.0.1 (major: rejects a `Transfer-Encoding` that doesn't end in `chunked`, which our clients don't send) and stripe 17.0.0 (major: pickled `StripeObject`s no longer keep the API key; we never pickle them), atproto 0.0.75, google-api-python-client 2.202.0, coverage 7.17.3, ruff 0.17.5, plus transitive patch/minor updates ([#107](https://github.com/Volksverpetzer/vvp_app_server/pull/107))
+* **Dependencies** — transitive patch/minor updates: cachecontrol 0.15.0 (bug fixes; only used by pip-audit), filelock 4.2.11, numpy 2.5.5, virtualenv 21.15.7; ruff pre-commit hook v0.17.5 to match the locked ruff
 * **Dependencies** — python-dateutil 4.0.0 (major release, pulled in by pandas and matplotlib; requires Python 3.11+, drops `six`, stricter `isoparse`). The server doesn't call dateutil directly, and pandas parses the WordPress `date_gmt` ISO timestamps itself ([#103](https://github.com/Volksverpetzer/vvp_app_server/pull/103))
 * **Tests** — render the real `/proxy/map` PNG and check that the quartiles use the palette in order, so near-identical colors can't come back unnoticed ([#103](https://github.com/Volksverpetzer/vvp_app_server/pull/103), updated for the swap in [#107](https://github.com/Volksverpetzer/vvp_app_server/pull/107))
 
