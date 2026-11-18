@@ -20,12 +20,22 @@ from .insta_feed import fetch_fresh_media_url
 # changes, but keep it short in case a link is misjudged as expired.
 GONE_MAX_AGE = 60 * 60
 
+# Hosts whose oe= parameter is Instagram's signed-URL expiry.
+INSTAGRAM_CDN_SUFFIXES = (".cdninstagram.com", ".fbcdn.net")
+
 
 def _is_expired_instagram_url(media_url: str) -> bool:
-    """Whether the Instagram CDN URL's own expiry (the hex unix timestamp in
-    its oe= parameter) has passed. False when there is no readable oe=, so
-    other URLs are fetched as before."""
-    values = parse_qs(urlsplit(media_url).query).get("oe")
+    """Whether an Instagram CDN URL's own expiry (the hex unix timestamp in
+    its oe= parameter) has passed. False for other hosts, unparsable URLs and
+    a missing or unreadable oe=, so those are fetched as before."""
+    try:
+        parts = urlsplit(media_url)
+        host = parts.hostname or ""
+    except ValueError:
+        return False
+    if not host.endswith(INSTAGRAM_CDN_SUFFIXES):
+        return False
+    values = parse_qs(parts.query).get("oe")
     if not values:
         return False
     try:

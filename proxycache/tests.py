@@ -518,6 +518,31 @@ class ProxyTest(TestCase):
         response = self.c.get(f"/proxy/media_url?hash=wrong&url={encoded}")
         self.assertEqual(response.status_code, 403)
 
+    def test_resolve_media_url_expired_oe_on_other_host_is_fetched(self):
+        # oe= only means Instagram's expiry on Instagram's CDN hosts.
+        orig = f"https://example.com/image.jpg?oe={int(time.time()) - 86400:X}"
+        token = generate_token(orig)
+        encoded = urllib.parse.quote(orig, safe="")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            mock_get.return_value.content = b"img"
+            mock_get.return_value.headers = {"Content-Type": "image/jpeg"}
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 200)
+        mock_get.assert_called_once()
+
+    def test_resolve_media_url_unparsable_plain_link_is_not_a_server_error(self):
+        # urlsplit() raises on an unmatched "[" in the host; a signed link like
+        # that must fall through to the normal fetch (and its 400), not a 500.
+        orig = "https://[broken.cdninstagram.com/a.jpg?oe=1"
+        token = generate_token(orig)
+        encoded = urllib.parse.quote(orig, safe="")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.InvalidURL("bad")
+            )
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 400)
+
     def test_fetch_fresh_media_url_picks_matching_child(self):
         from proxycache.services.insta_feed import fetch_fresh_media_url
 
