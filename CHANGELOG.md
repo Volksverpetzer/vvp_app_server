@@ -1,10 +1,17 @@
-# [1.7.9](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.8...v1.7.9) (2026-11-10)
+# [1.7.9](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.8...v1.7.9) (2026-11-18)
+
+
+### Changes
+
+* **Region map** — swap the colors of the two top tiers on `/proxy/map`: "Vorreiter" (top quartile) is now `#DB2685` and "Überdurchschnittlich" `#EE8FBE`. Matches `regionMapColors` in `@volksverpetzer/design-tokens` 0.11.0, which the app's legend uses ([#107](https://github.com/Volksverpetzer/vvp_app_server/pull/107))
+* **Instagram media proxy** — answer `410 Gone` for plain `/proxy/media_url` links (no `post_id`, issued before [#41](https://github.com/Volksverpetzer/vvp_app_server/pull/41)) whose Instagram CDN URL has expired (`oe=`), without fetching it; cacheable for an hour. These come from old browser copies, bookmarks and favorites in older app versions and can't be refreshed. A `400 Failed to fetch media URL.` now only means a link that should have worked. Links with `post_id` keep the fresh-URL retry ([#108](https://github.com/Volksverpetzer/vvp_app_server/pull/108))
 
 
 ### Chores
 
+* **Dependencies** — gunicorn 27.0.1 (major: rejects a `Transfer-Encoding` that doesn't end in `chunked`, which our clients don't send) and stripe 17.0.0 (major: pickled `StripeObject`s no longer keep the API key; we never pickle them), atproto 0.0.75, google-api-python-client 2.202.0, coverage 7.17.3, ruff 0.17.5, plus transitive patch/minor updates ([#107](https://github.com/Volksverpetzer/vvp_app_server/pull/107))
 * **Dependencies** — python-dateutil 4.0.0 (major release, pulled in by pandas and matplotlib; requires Python 3.11+, drops `six`, stricter `isoparse`). The server doesn't call dateutil directly, and pandas parses the WordPress `date_gmt` ISO timestamps itself ([#103](https://github.com/Volksverpetzer/vvp_app_server/pull/103))
-* **Tests** — render the real `/proxy/map` PNG and check that the quartiles use the palette in order, with `#EE8FBE` for the top quartile, so the near-identical pinks can't come back unnoticed ([#103](https://github.com/Volksverpetzer/vvp_app_server/pull/103))
+* **Tests** — render the real `/proxy/map` PNG and check that the quartiles use the palette in order, so near-identical colors can't come back unnoticed ([#103](https://github.com/Volksverpetzer/vvp_app_server/pull/103), updated for the swap in [#107](https://github.com/Volksverpetzer/vvp_app_server/pull/107))
 
 
 # [1.7.8](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.7...v1.7.8) (2026-11-10)
