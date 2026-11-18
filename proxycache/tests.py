@@ -1,4 +1,5 @@
 import os
+import time
 import urllib.parse
 from unittest.mock import MagicMock, patch
 
@@ -462,6 +463,86 @@ class ProxyTest(TestCase):
         # call from fetch_fresh_media_url either
         self.assertEqual(len(calls), 1)
 
+    def _instagram_url(self, oe: int) -> str:
+        return f"https://scontent.cdninstagram.com/v/a.jpg?_nc_ht=x&oe={oe:X}"
+
+    def test_resolve_media_url_expired_plain_link_is_gone(self):
+        # Plain link whose Instagram expiry (oe=, hex) is in the past: 410
+        # without any fetch, cacheable for a while by the CDN.
+        orig = self._instagram_url(int(time.time()) - 86400)
+        token = generate_token(orig)
+        encoded = urllib.parse.quote(orig, safe="")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 410)
+        mock_get.assert_not_called()
+        self.assertIn("max-age=3600", response["Cache-Control"])
+        self.assertIn("public", response["Cache-Control"])
+
+    def test_resolve_media_url_unexpired_plain_link_is_fetched(self):
+        orig = self._instagram_url(int(time.time()) + 86400)
+        token = generate_token(orig)
+        encoded = urllib.parse.quote(orig, safe="")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            mock_get.return_value.content = b"img"
+            mock_get.return_value.headers = {"Content-Type": "image/jpeg"}
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"img")
+
+    def test_resolve_media_url_expired_link_with_post_id_still_refreshes(self):
+        # Links with post context keep the fresh-URL retry even when expired.
+        orig = self._instagram_url(int(time.time()) - 86400)
+        token = generate_token_with_context(orig, "123", "", "volksverpetzer")
+        encoded = urllib.parse.quote(orig, safe="")
+        with (
+            patch("proxycache.services.resolve_media_url.requests.get") as mock_get,
+            patch(
+                "proxycache.services.resolve_media_url.fetch_fresh_media_url",
+                return_value=None,
+            ) as mock_fresh,
+        ):
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("403")
+            )
+            response = self.c.get(
+                f"/proxy/media_url?hash={token}&url={encoded}"
+                "&post_id=123&account=volksverpetzer"
+            )
+        self.assertEqual(response.status_code, 400)
+        mock_fresh.assert_called_once_with("123", "", "volksverpetzer")
+
+    def test_resolve_media_url_expired_plain_link_with_wrong_hash_is_forbidden(self):
+        orig = self._instagram_url(int(time.time()) - 86400)
+        encoded = urllib.parse.quote(orig, safe="")
+        response = self.c.get(f"/proxy/media_url?hash=wrong&url={encoded}")
+        self.assertEqual(response.status_code, 403)
+
+    def test_resolve_media_url_expired_oe_on_other_host_is_fetched(self):
+        # oe= only means Instagram's expiry on Instagram's CDN hosts.
+        orig = f"https://example.com/image.jpg?oe={int(time.time()) - 86400:X}"
+        token = generate_token(orig)
+        encoded = urllib.parse.quote(orig, safe="")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            mock_get.return_value.content = b"img"
+            mock_get.return_value.headers = {"Content-Type": "image/jpeg"}
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 200)
+        mock_get.assert_called_once()
+
+    def test_resolve_media_url_unparsable_plain_link_is_not_a_server_error(self):
+        # urlsplit() raises on an unmatched "[" in the host; a signed link like
+        # that must fall through to the normal fetch (and its 400), not a 500.
+        orig = "https://[broken.cdninstagram.com/a.jpg?oe=1"
+        token = generate_token(orig)
+        encoded = urllib.parse.quote(orig, safe="")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.InvalidURL("bad")
+            )
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 400)
+
     def test_fetch_fresh_media_url_picks_matching_child(self):
         from proxycache.services.insta_feed import fetch_fresh_media_url
 
@@ -809,6 +890,86 @@ class AnalyticsMapTest(TestCase):
             self.assertEqual(r.status_code, 200)
         blocked = self.client.get(reverse("map"))
         self.assertEqual(blocked.status_code, 429)
+
+    @patch("proxycache.services.analytics.cache_set")
+    @patch("proxycache.services.analytics.cache_get", return_value=None)
+    @patch("proxycache.services.analytics.requests.post")
+    @patch("proxycache.services.analytics.requests.get")
+    @override_settings(RATELIMIT_ENABLE=False)
+    def test_map_renders_quartiles_in_palette_order(
+        self, mock_get, mock_post, _mock_cache_get, _mock_cache_set
+    ):
+        """Render the real PNG and check each quartile's color.
+
+        Four side-by-side squares stand in for the states, ordered from the
+        lowest to the highest per-capita pageviews, so reading the middle row
+        left to right must give the palette from bottom to top quartile. The
+        top quartile (#DB2685) must stay distinguishable from the second
+        (#EE8FBE).
+        """
+        import io
+        import json
+
+        from PIL import Image
+        from proxycache.services.analytics import REGION_MAPPING
+
+        # Lowest to highest normalized pageviews (per 100k inhabitants).
+        regions = ["NW", "BY", "BW", "BE"]
+        features = [
+            {
+                "type": "Feature",
+                "properties": {"id": f"DE-{code}"},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[i, 0], [i + 1, 0], [i + 1, 1], [i, 1], [i, 0]]],
+                },
+            }
+            for i, code in enumerate(regions)
+        ]
+        geo_resp = MagicMock(
+            content=json.dumps(
+                {"type": "FeatureCollection", "features": features}
+            ).encode()
+        )
+        mock_get.return_value = geo_resp
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "results": [
+                    {
+                        "dimensions": [f"DE-{code}"],
+                        "metrics": [
+                            (rank + 1) * 10 * REGION_MAPPING[code]["population"] / 10**5
+                        ],
+                    }
+                    for rank, code in enumerate(regions)
+                ]
+            },
+        )
+
+        response = self.client.get(reverse("map"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+
+        palette = {
+            (0x1B, 0x71, 0x94): "#1B7194",
+            (0x38, 0x93, 0xC0): "#3893C0",
+            (0xDB, 0x26, 0x85): "#DB2685",
+            (0xEE, 0x8F, 0xBE): "#EE8FBE",
+        }
+        image = Image.open(io.BytesIO(response.content)).convert("RGB")
+        y = image.height // 2
+        seen: list[str] = []
+        for x in range(image.width):
+            color = palette.get(image.getpixel((x, y)))  # type: ignore[arg-type]
+            if color and (not seen or seen[-1] != color):
+                seen.append(color)
+        # The background shares the bottom quartile's color, so it can show
+        # up at either edge; drop it there before comparing.
+        while seen and seen[-1] == "#1B7194":
+            seen.pop()
+        self.assertEqual(seen[-3:], ["#3893C0", "#EE8FBE", "#DB2685"])
+        self.assertIn("#1B7194", seen[:-3])
 
 
 class CacheUtilsTest(TestCase):

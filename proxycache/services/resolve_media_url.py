@@ -1,5 +1,7 @@
 import hashlib
 import hmac
+import time
+from urllib.parse import parse_qs, urlsplit
 
 import requests
 from django.core.cache import cache
@@ -9,9 +11,37 @@ from django.http import (
     HttpResponseBadRequest,
     HttpResponseForbidden,
 )
+from django.utils.cache import patch_cache_control
 
 from ..helper import generate_token, generate_token_with_context
 from .insta_feed import fetch_fresh_media_url
+
+# How long Bunny may cache a 410 for an expired plain link. The answer never
+# changes, but keep it short in case a link is misjudged as expired.
+GONE_MAX_AGE = 60 * 60
+
+# Hosts whose oe= parameter is Instagram's signed-URL expiry.
+INSTAGRAM_CDN_SUFFIXES = (".cdninstagram.com", ".fbcdn.net")
+
+
+def _is_expired_instagram_url(media_url: str) -> bool:
+    """Whether an Instagram CDN URL's own expiry (the hex unix timestamp in
+    its oe= parameter) has passed. False for other hosts, unparsable URLs and
+    a missing or unreadable oe=, so those are fetched as before."""
+    try:
+        parts = urlsplit(media_url)
+        host = parts.hostname or ""
+    except ValueError:
+        return False
+    if not host.endswith(INSTAGRAM_CDN_SUFFIXES):
+        return False
+    values = parse_qs(parts.query).get("oe")
+    if not values:
+        return False
+    try:
+        return int(values[0], 16) < time.time()
+    except ValueError:
+        return False
 
 
 def _fetch(media_url: str):
@@ -60,6 +90,16 @@ def resolve_media_url(request: HttpRequest):
     cached = cache.get(cache_key)
     if cached:
         return HttpResponse(cached["content"], content_type=cached["content_type"])
+
+    if not post_id and _is_expired_instagram_url(media_url):
+        # A plain link (issued before post context was added) whose Instagram
+        # URL has expired: without a post_id it can't be refreshed, so
+        # fetching it would only fail. Answer 410 without asking Instagram,
+        # which also tells these apart from real failures in the logs (a 400
+        # below means a link that should have worked).
+        response = HttpResponse("Media URL expired.", status=410)
+        patch_cache_control(response, public=True, max_age=GONE_MAX_AGE)
+        return response
 
     content, content_type = _fetch(media_url)
 
