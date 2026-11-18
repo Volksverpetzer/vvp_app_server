@@ -1,4 +1,5 @@
 import os
+import time
 import urllib.parse
 from unittest.mock import MagicMock, patch
 
@@ -461,6 +462,61 @@ class ProxyTest(TestCase):
         # only the single primary fetch attempt — no post_id, so no Instagram
         # call from fetch_fresh_media_url either
         self.assertEqual(len(calls), 1)
+
+    def _instagram_url(self, oe: int) -> str:
+        return f"https://scontent.cdninstagram.com/v/a.jpg?_nc_ht=x&oe={oe:X}"
+
+    def test_resolve_media_url_expired_plain_link_is_gone(self):
+        # Plain link whose Instagram expiry (oe=, hex) is in the past: 410
+        # without any fetch, cacheable for a while by the CDN.
+        orig = self._instagram_url(int(time.time()) - 86400)
+        token = generate_token(orig)
+        encoded = urllib.parse.quote(orig, safe="")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 410)
+        mock_get.assert_not_called()
+        self.assertIn("max-age=3600", response["Cache-Control"])
+        self.assertIn("public", response["Cache-Control"])
+
+    def test_resolve_media_url_unexpired_plain_link_is_fetched(self):
+        orig = self._instagram_url(int(time.time()) + 86400)
+        token = generate_token(orig)
+        encoded = urllib.parse.quote(orig, safe="")
+        with patch("proxycache.services.resolve_media_url.requests.get") as mock_get:
+            mock_get.return_value.content = b"img"
+            mock_get.return_value.headers = {"Content-Type": "image/jpeg"}
+            response = self.c.get(f"/proxy/media_url?hash={token}&url={encoded}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b"img")
+
+    def test_resolve_media_url_expired_link_with_post_id_still_refreshes(self):
+        # Links with post context keep the fresh-URL retry even when expired.
+        orig = self._instagram_url(int(time.time()) - 86400)
+        token = generate_token_with_context(orig, "123", "", "volksverpetzer")
+        encoded = urllib.parse.quote(orig, safe="")
+        with (
+            patch("proxycache.services.resolve_media_url.requests.get") as mock_get,
+            patch(
+                "proxycache.services.resolve_media_url.fetch_fresh_media_url",
+                return_value=None,
+            ) as mock_fresh,
+        ):
+            mock_get.return_value.raise_for_status.side_effect = (
+                requests.exceptions.HTTPError("403")
+            )
+            response = self.c.get(
+                f"/proxy/media_url?hash={token}&url={encoded}"
+                "&post_id=123&account=volksverpetzer"
+            )
+        self.assertEqual(response.status_code, 400)
+        mock_fresh.assert_called_once_with("123", "", "volksverpetzer")
+
+    def test_resolve_media_url_expired_plain_link_with_wrong_hash_is_forbidden(self):
+        orig = self._instagram_url(int(time.time()) - 86400)
+        encoded = urllib.parse.quote(orig, safe="")
+        response = self.c.get(f"/proxy/media_url?hash=wrong&url={encoded}")
+        self.assertEqual(response.status_code, 403)
 
     def test_fetch_fresh_media_url_picks_matching_child(self):
         from proxycache.services.insta_feed import fetch_fresh_media_url
