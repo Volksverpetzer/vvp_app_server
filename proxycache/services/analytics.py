@@ -25,6 +25,13 @@ LONG_CACHE_TTL = 60 * 60 * 24  # 1 day
 
 DEFAULT_SITE = "volksverpetzer.de"
 
+# Event names that count as a page view. Plausible's own "pageview" (website,
+# and the app from the release that renamed its event) plus the custom
+# "pageviews" event older app versions send. Plausible's "pageviews" metric
+# only counts "pageview" events, so /stats/ counts "events" filtered to both
+# names instead -- otherwise every app read before the rename is missing.
+PAGEVIEW_EVENTS = ["pageview", "pageviews"]
+
 SITES = {
     "volksverpetzer.de": {"wp_base": "https://volksverpetzer.de"},
     "pruefpunkt.org": {"wp_base": "https://www.pruefpunkt.org"},
@@ -380,9 +387,12 @@ def stats(request: HttpRequest, remaining: str) -> JsonResponse | HttpResponse:
     headers = {"Authorization": "Bearer " + os.environ["PLAUSIBLE_TOKEN"]}
     payload = {
         "site_id": site,
-        "metrics": ["pageviews"],
+        "metrics": ["events"],
         "date_range": "all",
-        "filters": [["is", "event:page", [page]]],
+        "filters": [
+            ["is", "event:page", [page]],
+            ["is", "event:name", PAGEVIEW_EVENTS],
+        ],
     }
     try:
         resp = requests.post(
