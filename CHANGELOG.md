@@ -1,3 +1,17 @@
+# [1.8.0](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.9...v1.8.0) (2026-11-24)
+
+
+### Changes
+
+* **Article stats** — `/proxy/stats/` now counts the app's article reads, not only the website's. It sums Plausible's built-in `pageview` event and the app's custom `pageviews` event, which the app sends today; the app switches to `pageview` in [vvp_app#788](https://github.com/Volksverpetzer/vvp_app/pull/788), and both keep counting once it does. ([#112](https://github.com/Volksverpetzer/vvp_app_server/pull/112))
+
+
+### Chores
+
+* **Dependencies** — stripe 17.1.0 (pins API version `2026-11-18.endive`, same major as before), coverage 7.17.4, ruff 0.17.6; ruff pre-commit hook v0.17.6 to match the locked ruff (Dependabot [#111](https://github.com/Volksverpetzer/vvp_app_server/pull/111), landed with [#112](https://github.com/Volksverpetzer/vvp_app_server/pull/112))
+* **Dependencies** — django-axes 9.1.0 (internal cleanup; no setting changes), coverage 7.17.5, plus transitive patch/minor updates: certifi 2026.11.20, charset-normalizer 3.5.3, filelock 4.3.1, google-auth 2.63.1, platformdirs 4.14.8, pydantic 2.14.4, pydantic-core 2.50.5, python-discovery 1.9.7, pyyaml 6.0.4, tlds 2026112100, types-pyyaml 6.0.12.20261122, virtualenv 21.15.12
+
+
 # [1.7.9](https://github.com/Volksverpetzer/vvp_app_server/compare/v1.7.8...v1.7.9) (2026-11-18)
 
 
