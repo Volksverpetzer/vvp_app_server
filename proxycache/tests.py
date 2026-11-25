@@ -774,6 +774,32 @@ class AnalyticsSiteTests(TestCase):
         self.assertIn("pruefpunkt.org", mock_get.call_args[0][0])
 
     @patch.dict(os.environ, {"PLAUSIBLE_TOKEN": "test"})  # nosec
+    @patch("proxycache.services.analytics.requests.post")
+    @patch("proxycache.services.analytics.requests.get")
+    @patch("proxycache.services.analytics.cache_set")
+    @patch("proxycache.services.analytics.cache_get", return_value=None)
+    def test_stats_counts_website_and_app_pageview_events(
+        self, _cg, _cs, mock_get, mock_post
+    ):
+        # The app sent its page views as a custom "pageviews" event before it
+        # switched to Plausible's own "pageview"; both must be counted, which
+        # the "pageviews" metric (only "pageview" events) wouldn't do.
+        self._mock_plausible(mock_post, value=1234)
+        self._mock_wp(mock_get)
+        response = self.client.get(reverse("stats", args=["aktuelles/slug"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"pageviews": 1234})
+        payload = mock_post.call_args[1]["json"]
+        self.assertEqual(payload["metrics"], ["events"])
+        self.assertEqual(
+            payload["filters"],
+            [
+                ["is", "event:page", ["/aktuelles/slug/"]],
+                ["is", "event:name", ["pageview", "pageviews"]],
+            ],
+        )
+
+    @patch.dict(os.environ, {"PLAUSIBLE_TOKEN": "test"})  # nosec
     def test_stats_invalid_site_returns_400(self):
         response = self.client.get(reverse("stats", args=["slug"]) + "?site=evil.com")
         self.assertEqual(response.status_code, 400)
